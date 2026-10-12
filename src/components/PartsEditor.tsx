@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ReactFlow, ReactFlowProvider, type Node, type NodeProps } from '@xyflow/react'
 import { api, describeError, refreshCatalog, useCatalog, type CatalogSummary, type PartSummary } from '../api'
-import { checkModule, deriveCapability } from '../model/catalog'
+import { checkModule, deriveCapability, resolvePorts } from '../model/catalog'
 import { checkParameterSchema, defaultsFor, leafPaths } from '../model/schema'
 import {
   DEPENDENCY_KINDS,
@@ -63,6 +63,7 @@ export function PartsEditor({ onMessage }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [newCatalog, setNewCatalog] = useState<{ vendor: string; name: string } | null>(null)
   const [choosing, setChoosing] = useState(false)
+  const [tryOut, setTryOut] = useState<{ schema: string; value: { [k: string]: JsonValue } }>({ schema: '', value: {} })
 
   const reload = useCallback(async () => {
     try {
@@ -233,6 +234,9 @@ export function PartsEditor({ onMessage }: Props) {
   const q = filter.toLowerCase()
   const shown = parts.filter((p) => !q || `${p.name} ${p.id} ${p.role} ${p.vendor ?? ''}`.toLowerCase().includes(q))
   const cap = deriveCapability(draft)
+  // Try-out values of the core-parameter preview form; they restart from the defaults when the schema changes.
+  const coreKey = JSON.stringify(draft.parameters.schema)
+  const tryCore = tryOut.schema === coreKey ? tryOut.value : ((defaultsFor(draft.parameters.schema) as { [k: string]: JsonValue }) ?? {})
   const coreLeaves = leafPaths(draft.parameters.schema)
 
   return (
@@ -427,7 +431,12 @@ export function PartsEditor({ onMessage }: Props) {
                 onChange={(schema) => set('parameters', { schema })}
                 onError={(msg) => setJsonError('core parameter schema', msg)}
               />
-              <SchemaPreview schema={draft.parameters.schema} />
+              <SchemaPreview
+                schema={draft.parameters.schema}
+                label="Designer form preview (try it; drives the node preview; not saved)"
+                value={tryCore}
+                onChange={(value) => setTryOut({ schema: coreKey, value })}
+              />
             </div>
 
             {/* 4. Vendor settings */}
@@ -698,7 +707,7 @@ export function PartsEditor({ onMessage }: Props) {
       {target && (
         <aside className="part-preview">
           <h2>Preview</h2>
-          <Preview prim={draft} />
+          <Preview prim={draft} params={tryCore} />
           <p className="hint">How instances appear on the canvas with default parameters.</p>
         </aside>
       )}
@@ -824,12 +833,23 @@ function SchemaText({ value, onChange, onError }: { value: JsonSchema; onChange:
 
 // A working copy of the form designers will get, to try it out (values aren't saved anywhere).
 // It restarts from the defaults whenever the schema changes.
-function SchemaPreview({ schema, label = 'Designer form preview (try it; not saved)' }: { schema: JsonSchema; label?: string }) {
+// With `value`/`onChange` the try-out values are kept by the caller (e.g. to drive the node preview).
+function SchemaPreview({
+  schema,
+  label = 'Designer form preview (try it; not saved)',
+  value,
+  onChange,
+}: {
+  schema: JsonSchema
+  label?: string
+  value?: { [k: string]: JsonValue }
+  onChange?: (v: { [k: string]: JsonValue }) => void
+}) {
   const ok = checkParameterSchema(schema).length === 0
   return (
     <div className="schema-preview">
       <span className="hint">{label}</span>
-      {ok && <PreviewForm key={JSON.stringify(schema)} schema={schema} />}
+      {ok && (value && onChange ? <SchemaForm schema={schema} value={value} onChange={onChange} /> : <PreviewForm key={JSON.stringify(schema)} schema={schema} />)}
     </div>
   )
 }
@@ -952,17 +972,20 @@ function RowButtons<T>({ index, items, onChange }: { index: number; items: T[]; 
 
 // ---- Preview ----
 
-type PreviewNode = Node<{ prim: VendorModule }, 'preview'>
+type PreviewNode = Node<{ prim: VendorModule; params: { [k: string]: JsonValue } }, 'preview'>
 
 function PreviewNodeView({ id, data }: NodeProps<PreviewNode>) {
-  return <ModulePreview id={id} prim={data.prim} />
+  return <ModulePreview id={id} prim={data.prim} params={data.params} />
 }
 
 const previewTypes = { preview: PreviewNodeView }
 
-function Preview({ prim }: { prim: VendorModule }) {
-  const nodes: PreviewNode[] = [{ id: 'preview', type: 'preview', position: { x: 0, y: 0 }, data: { prim }, draggable: false, selectable: false }]
-  const shape = `${prim.ports.length}|${JSON.stringify(defaultsFor(prim.parameters.schema))}`
+// The node as designers will see it, with the try-out values (e.g. bonding adds a second input).
+function Preview({ prim, params }: { prim: VendorModule; params: { [k: string]: JsonValue } }) {
+  const nodes: PreviewNode[] = [{ id: 'preview', type: 'preview', position: { x: 0, y: 0 }, data: { prim, params }, draggable: false, selectable: false }]
+  const shape = resolvePorts(prim.ports, params)
+    .map((p) => p.key)
+    .join(',')
   return (
     <div className="preview-canvas">
       <ReactFlowProvider>

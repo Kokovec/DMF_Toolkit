@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import { currentCatalog, isRequired, KNOWN_FORMATS, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
+import { currentCatalog, KNOWN_FORMATS, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
 import { EXTERNALS } from './externals'
 import { settingsSchema } from './modules'
 import { defaultsFor, getPath, leafPaths, validateValue, withoutInapplicable } from './schema'
@@ -406,9 +406,12 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
     const prim = cat.get(f.type, f.typeVersion)!
     errors.push(...validateValue(prim.parameters.schema, f.parameters).map((e) => `${f.id}: ${e}`))
     errors.push(...validateValue(settingsSchema(prim), f.settings ?? {}, 'settings').map((e) => `${f.id}: ${e}`))
-    // '1' needs its wire; '1..n' needs at least one element of the array wired.
+    // '1' needs its wire (each path, when a port has two); '1..n' needs at least one array element wired.
     const resolved = resolvePorts(prim.ports, f.parameters)
-    for (const p of prim.ports.filter((q) => q.direction === 'in' && isRequired(q)))
+    for (const r of resolved)
+      if (r.direction === 'in' && r.cardinality === '1' && !fed.has(ref(f.id, r.key)))
+        errors.push(`${f.id}: input ${r.label && r.key !== r.id ? `${r.key} (${r.label})` : r.key} must be connected`)
+    for (const p of prim.ports.filter((q) => q.direction === 'in' && q.cardinality === '1..n'))
       if (!resolved.some((r) => r.id === p.id && fed.has(ref(f.id, r.key))))
         errors.push(`${f.id}: input ${p.id} must be connected`)
     for (const d of prim.dependencies)

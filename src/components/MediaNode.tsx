@@ -5,7 +5,7 @@ import { isEdge, isRequired, resolvePorts, transportLabel, type ResolvedPort } f
 import { EXTERNALS } from '../model/externals'
 import { roleLabel } from '../model/primitives'
 import { defaultsFor } from '../model/schema'
-import type { VendorModule } from '../model/types'
+import type { JsonValue, VendorModule } from '../model/types'
 import { BUNDLE, portsOf, moduleOf, type ExtNode, type FnNode } from '../model/workload'
 
 export function FunctionNode({ id, data, selected }: NodeProps<FnNode>) {
@@ -37,14 +37,14 @@ export function ExternalNode({ id, data, selected }: NodeProps<ExtNode>) {
 }
 
 // A primitive as it would appear on the canvas with default parameters (parts editor preview).
-export function ModulePreview({ id, prim }: { id: string; prim: VendorModule }) {
+export function ModulePreview({ id, prim, params }: { id: string; prim: VendorModule; params?: { [k: string]: JsonValue } }) {
   return (
     <NodeView
       id={id}
       className={nodeClass(prim)}
       title={prim.name || 'Unnamed'}
       subtitle={`${prim.role ? roleLabel(prim.role) : 'primitive?'} · ${prim.vendor || 'vendor?'}`}
-      ports={resolvePorts(prim.ports, defaultsFor(prim.parameters.schema))}
+      ports={resolvePorts(prim.ports, params ?? defaultsFor(prim.parameters.schema))}
     />
   )
 }

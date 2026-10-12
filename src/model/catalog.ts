@@ -1,6 +1,6 @@
 import { catalogProblems, coreSchemaFor, portChoiceOf, portsFor, protocolsFor } from './modules'
 import { getPrimitive } from './primitives'
-import { checkParameterSchema, getPath, leafPaths, schemaAt } from './schema'
+import { applies, checkParameterSchema, getPath, leafPaths, schemaAt } from './schema'
 import {
   API_VERSION,
   CARDINALITIES,
@@ -112,6 +112,14 @@ export type ResolvedPort = PortDef & {
 // Concrete ports for an instance, expanding port arrays from their size parameter.
 export function resolvePorts(ports: PortDef[], params: JsonValue | undefined): ResolvedPort[] {
   return ports.flatMap((p) => {
+    // A port with a per-instance second path (e.g. SRT bonding) becomes path A + path B.
+    if (p.dualWhen && applies({ 'x-when': p.dualWhen }, params, params)) {
+      const name = p.transport === 'mxl' ? p.id : (TRANSPORT_LABELS[p.transport.external] ?? p.transport.external)
+      return [
+        { ...p, key: p.id, label: `${name} A`, cardinality: '1' as const, group: p.timeContext },
+        { ...p, key: `${p.id}.b`, label: `${name} B`, cardinality: '1' as const, group: p.timeContext },
+      ]
+    }
     if (!p.cardinality.endsWith('n')) return [{ ...p, key: p.id, group: p.timeContext }]
     const n = p.arraySize ? Math.max(0, Math.floor(Number(getPath(params, p.arraySize)) || 0)) : 1
     return Array.from({ length: n }, (_, i) => ({
@@ -253,6 +261,7 @@ export function conformance(m: VendorModule, prim: PrimitiveDef): string[] {
     else if (port.direction !== e.direction || port.essence !== e.essence || (port.transport === 'mxl') !== (e.transport === 'mxl'))
       errors.push(`port ${e.id} must be ${e.direction} ${e.essence} over ${e.transport === 'mxl' ? 'MXL' : 'the external protocol'}, as on ${prim.name}`)
     else if (port.arraySize !== e.arraySize) errors.push(`port ${e.id} must be an array sized by "${e.arraySize}"`)
+    else if (JSON.stringify(port.dualWhen) !== JSON.stringify(e.dualWhen)) errors.push(`port ${e.id} must keep the primitive's second-path rule`)
   }
   for (const port of m.ports)
     if (!expected.some((e) => e.id === port.id)) errors.push(`port ${port.id} is not a port of ${prim.name}`)

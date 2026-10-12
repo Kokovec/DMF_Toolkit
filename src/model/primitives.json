@@ -34,7 +34,13 @@
             "side": "external",
             "dualFor": [
               "st2022-7"
-            ]
+            ],
+            "dualWhen": {
+              "srt.bonding": [
+                "broadcast",
+                "main-backup"
+              ]
+            }
           },
           {
             "id": "out.video",

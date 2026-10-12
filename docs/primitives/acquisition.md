@@ -45,6 +45,7 @@ between functions (containers); external protocols exist only at the facility ed
 |---|---|---|
 | Input | `in.video`: video feed (with its audio and ANC), or `in.audio`: audio-only feed | — |
 | Protocol | SRT, ZIXI, RIST, 2022-7, RTP, Raw UDP, RTMP (JPEG XS is a codec, not a protocol) | one per module; a vendor handling several protocols makes one module per protocol |
+| SRT bonding | — | with bonding broadcast / main-backup the node gets a **second input**: `in.video` ("SRT A") + `in.video.b` ("SRT B"), both required; path A keeps its wire when bonding is toggled |
 | 2022-7 | — | **two inputs**, `in.video.a` + `in.video.b` (or `in.audio.a/.b`): legs A and B of the protected stream, both required. One External source can feed both |
 | Output | locked to **MXL** | video feed → `out.video`, `out.audio`, `out.anc` flows; audio feed → `out.audio` |
 

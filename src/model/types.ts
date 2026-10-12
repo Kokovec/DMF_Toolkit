@@ -87,6 +87,9 @@ export type PortDef = {
   constraints?: PortConstraints
   timeContext?: string // ports with the same value share a time context (drawn as a bundle)
   transport: Transport
+  // Second path per instance: while these parameter conditions hold (x-when style, dotted paths from
+  // the parameters root), the port becomes path A (`<id>`) + path B (`<id>.b`), both required.
+  dualWhen?: Record<string, (string | number | boolean)[]>
 }
 
 // The JSON Schema subset the tool understands for forms; vendors may use more.
@@ -315,6 +318,8 @@ export type PortTemplate = {
   // Protocols that need two legs on this port (seamless protection, e.g. ST 2022-7): the port
   // becomes "<id>.a" and "<id>.b", both required.
   dualFor?: ExternalTransport[]
+  // Per-instance second path (e.g. SRT bonding): see PortDef.dualWhen.
+  dualWhen?: Record<string, (string | number | boolean)[]>
   // Only present when the module's chosen input essence is one of these (e.g. out.video only
   // for video feeds).
   whenInput?: Essence[]

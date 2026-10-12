@@ -80,6 +80,7 @@ export function portsFor(prim: PrimitiveDef, choice: PortChoice = {}): PortDef[]
       if (t.label) port.label = t.label
       if (t.arraySize) port.arraySize = t.arraySize
       if (t.timeContext) port.timeContext = t.timeContext
+      if (t.dualWhen) port.dualWhen = t.dualWhen
       if (t.side !== 'external' || !t.dualFor?.includes(protocol)) return [port]
       // Two legs of one protected stream (e.g. ST 2022-7 path A and path B), both required.
       const name = `${TRANSPORT_LABELS[protocol]}${e === 'audio' ? ' audio' : ''}`

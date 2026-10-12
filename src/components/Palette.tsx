@@ -1,0 +1,117 @@
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { api, describeError, refreshCatalog, useCatalog, type CatalogSummary } from '../api'
+import { checkCatalog, isEdge } from '../model/catalog'
+import { EXTERNALS, EXTERNAL_KINDS } from '../model/externals'
+import { primitiveTree } from '../model/primitives'
+import type { ModuleCatalog } from '../model/types'
+
+export const DRAG_MIME = 'application/x-dmf-node' // "fn:<primitive id>" or "ext:<external kind>"
+
+type Props = { online: boolean; onMessage: (msg: string, isError: boolean) => void }
+
+export function Palette({ online, onMessage }: Props) {
+  const catalog = useCatalog()
+  const [catalogs, setCatalogs] = useState<CatalogSummary[]>([])
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (online) api.catalogs().then(setCatalogs, () => setCatalogs([]))
+  }, [online, catalog])
+
+  const importCatalog = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const doc = JSON.parse(await file.text())
+      const problems = checkCatalog(doc)
+      if (problems.length) return onMessage(`Cannot import ${file.name}: ${problems.slice(0, 3).join('; ')}`, true)
+      const r = await api.importCatalog(doc as ModuleCatalog)
+      await refreshCatalog()
+      onMessage(
+        `Imported ${(doc as ModuleCatalog).metadata.name}: ${r.added.length} added, ${r.updated.length} updated, ${r.unchanged.length} unchanged`,
+        false,
+      )
+    } catch (err) {
+      onMessage(err instanceof SyntaxError ? `${file.name} is not valid JSON` : `Import failed: ${describeError(err)}`, true)
+    }
+  }
+
+  const drag = (value: string) => (e: React.DragEvent) => {
+    e.dataTransfer.setData(DRAG_MIME, value)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  return (
+    <aside className="palette">
+      {primitiveTree().map(({ category, primitives }) => (
+        <section key={category.id} className="palette-category">
+          <h2 title={category.description}>{category.name}</h2>
+          {primitives.map((prim) => (
+            <section key={prim.id}>
+              <h3 title={prim.description}>{prim.plural}</h3>
+              {catalog.forRole(prim.id).length === 0 && <p className="hint">No vendor modules yet.</p>}
+              {catalog.forRole(prim.id).map((p) => (
+            <div
+              key={p.id}
+              className={`palette-item fn${isEdge(p) ? ' edge' : ''}`}
+              draggable
+              title={`${p.description}\n${p.id}@${p.version}`}
+              onDragStart={drag(`fn:${p.id}`)}
+            >
+              {p.name}
+              <span className="hint"> {p.vendor}</span>
+            </div>
+              ))}
+            </section>
+          ))}
+        </section>
+      ))}
+
+      <h2 className="palette-section">External devices</h2>
+      {EXTERNAL_KINDS.map((k) => (
+        <div key={k} className="palette-item ext" draggable title={EXTERNALS[k].description} onDragStart={drag(`ext:${k}`)}>
+          {EXTERNALS[k].name}
+        </div>
+      ))}
+
+      <section className="library">
+        <h3>Library</h3>
+        {online ? (
+          <>
+            {catalogs.map((c) => (
+              <div key={c.id} className="library-item">
+                <span title={`${c.id} v${c.version}`}>
+                  {c.name} <span className="hint">({c.moduleCount})</span>
+                </span>
+                <a href={`/api/catalogs/${encodeURIComponent(c.id)}`} download={`${c.id}.catalog.json`}>
+                  Export
+                </a>
+              </div>
+            ))}
+            <button onClick={() => fileInput.current?.click()}>Import catalog…</button>
+            <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importCatalog} />
+          </>
+        ) : (
+          <p className="hint">Offline: no vendor modules. Start the library server with `npm run server`.</p>
+        )}
+      </section>
+
+      <div className="legend">
+        <h3>Legend</h3>
+        {(['video', 'audio', 'data'] as const).map((e) => (
+          <div key={e} className={`legend-item essence-${e}`}>
+            <span className="swatch" /> {e}
+          </div>
+        ))}
+        <div className="legend-item">
+          <span className="swatch bundle-swatch" /> bundle (shared time context)
+        </div>
+      </div>
+      <p className="hint">
+        Generic functions (dashed) are role placeholders: bind them to a vendor implementation before publishing. Drag between
+        bundle handles to wire video + audio together; drag between single ports to split them.
+      </p>
+    </aside>
+  )
+}

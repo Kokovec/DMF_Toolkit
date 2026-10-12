@@ -1,0 +1,1342 @@
+{
+  "apiVersion": "dmf-toolkit/v1alpha2",
+  "kind": "PrimitiveLibrary",
+  "spec": {
+    "categories": [
+      {
+        "id": "acquisition",
+        "name": "Acquisition",
+        "description": "Getting media into the facility: receiving live streams, decoding contribution feeds, and aligning sources in time."
+      },
+      {
+        "id": "distribution",
+        "name": "Distribution",
+        "description": "Getting media out of the facility to its audiences and partners: encoding for delivery and onward transport."
+      }
+    ],
+    "primitives": [
+      {
+        "id": "acquisition.receiver",
+        "category": "acquisition",
+        "name": "Receiver",
+        "plural": "Receivers",
+        "description": "Edge function (gateway) that receives one external stream on one protocol (SRT, ZIXI, RIST, 2022-7, RTP, Raw UDP or RTMP), decodes and normalizes it, timestamps each grain at ingress and publishes it as MXL flows: video, audio and ANC for a video feed, audio only for an audio feed.",
+        "ports": [
+          {
+            "id": "in",
+            "direction": "in",
+            "essence": "video",
+            "essenceOptions": [
+              "video",
+              "audio"
+            ],
+            "cardinality": "1",
+            "side": "external",
+            "dualFor": [
+              "st2022-7"
+            ]
+          },
+          {
+            "id": "out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl",
+            "whenInput": [
+              "video"
+            ]
+          },
+          {
+            "id": "out.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl",
+            "whenInput": [
+              "video",
+              "audio"
+            ]
+          },
+          {
+            "id": "out.anc",
+            "direction": "out",
+            "essence": "data",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl",
+            "whenInput": [
+              "video"
+            ]
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "required": [],
+            "properties": {
+              "srt": {
+                "type": "object",
+                "title": "SRT session",
+                "x-protocols": [
+                  "srt"
+                ],
+                "x-audience": "function",
+                "description": "Defines the SRT connection itself. Supplied here and injected into the media function by the orchestrator. Shared settings first, then each path's own connection.",
+                "required": [
+                  "mode",
+                  "latencyMs",
+                  "passphrase"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "title": "Mode",
+                    "enum": [
+                      "listener",
+                      "caller",
+                      "rendezvous"
+                    ],
+                    "default": "listener"
+                  },
+                  "bonding": {
+                    "type": "string",
+                    "title": "Bonding",
+                    "description": "Two SRT connections over independent paths (SRT connection bonding). broadcast: both carry the stream, the first good packet wins (seamless, 2022-7 style); main-backup: path B takes over if path A fails. The settings above apply to both paths.",
+                    "enum": [
+                      "none",
+                      "broadcast",
+                      "main-backup"
+                    ],
+                    "default": "none"
+                  },
+                  "latencyMs": {
+                    "type": "integer",
+                    "title": "Latency (ms)",
+                    "description": "Must be \u2265 the sender's latency.",
+                    "minimum": 20,
+                    "maximum": 8000,
+                    "default": 120
+                  },
+                  "encryption": {
+                    "type": "string",
+                    "title": "Encryption",
+                    "enum": [
+                      "off",
+                      "aes-128",
+                      "aes-256"
+                    ],
+                    "default": "off"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "title": "Passphrase",
+                    "format": "secret-ref",
+                    "description": "Required when encryption is enabled.",
+                    "x-when": {
+                      "encryption": [
+                        "aes-128",
+                        "aes-256"
+                      ]
+                    }
+                  },
+                  "streamId": {
+                    "type": "string",
+                    "title": "Stream ID",
+                    "description": "Optional; used for multiplexing or identification."
+                  },
+                  "mtu": {
+                    "type": "integer",
+                    "title": "MTU",
+                    "description": "Usually left at the default unless the path requires otherwise.",
+                    "minimum": 76,
+                    "maximum": 1500,
+                    "default": 1500
+                  },
+                  "pathA": {
+                    "type": "object",
+                    "title": "Connection",
+                    "x-group": "paths",
+                    "required": [
+                      "port",
+                      "remoteAddress"
+                    ],
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "title": "Port",
+                        "description": "Local listen port (Listener) or remote port (Caller / Rendezvous).",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "remoteAddress": {
+                        "type": "string",
+                        "title": "Remote address",
+                        "description": "IP or hostname of the remote party (Caller / Rendezvous).",
+                        "x-when": {
+                          "srt.mode": [
+                            "caller",
+                            "rendezvous"
+                          ]
+                        }
+                      }
+                    },
+                    "x-title-when": [
+                      {
+                        "when": {
+                          "srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "title": "Path A"
+                      }
+                    ]
+                  },
+                  "pathB": {
+                    "type": "object",
+                    "title": "Path B",
+                    "x-group": "paths",
+                    "required": [
+                      "port",
+                      "remoteAddress"
+                    ],
+                    "properties": {
+                      "port": {
+                        "type": "integer",
+                        "title": "Port",
+                        "description": "Local listen port (Listener) or remote port (Caller / Rendezvous).",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "remoteAddress": {
+                        "type": "string",
+                        "title": "Remote address",
+                        "description": "IP or hostname of the remote party (Caller / Rendezvous).",
+                        "x-when": {
+                          "srt.mode": [
+                            "caller",
+                            "rendezvous"
+                          ]
+                        }
+                      }
+                    },
+                    "x-when": {
+                      "bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    }
+                  }
+                }
+              },
+              "network": {
+                "type": "object",
+                "title": "Network constraints",
+                "x-audience": "orchestrator",
+                "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+                "properties": {
+                  "exposure": {
+                    "type": "string",
+                    "title": "Exposure",
+                    "enum": [
+                      "wan-facing",
+                      "internal"
+                    ],
+                    "default": "wan-facing"
+                  },
+                  "pathA": {
+                    "type": "object",
+                    "title": "Network",
+                    "x-group": "paths",
+                    "properties": {
+                      "network": {
+                        "type": "string",
+                        "title": "Network",
+                        "description": "Logical network the stream arrives on, e.g. contribution."
+                      },
+                      "zone": {
+                        "type": "string",
+                        "title": "Preferred zone"
+                      },
+                      "vlan": {
+                        "type": "string",
+                        "title": "Preferred VLAN / segment"
+                      }
+                    },
+                    "x-title-when": [
+                      {
+                        "when": {
+                          "srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "title": "Path A network"
+                      }
+                    ]
+                  },
+                  "pathB": {
+                    "type": "object",
+                    "title": "Path B network",
+                    "x-group": "paths",
+                    "properties": {
+                      "network": {
+                        "type": "string",
+                        "title": "Network",
+                        "description": "Logical network the stream arrives on, e.g. contribution."
+                      },
+                      "zone": {
+                        "type": "string",
+                        "title": "Preferred zone"
+                      },
+                      "vlan": {
+                        "type": "string",
+                        "title": "Preferred VLAN / segment"
+                      }
+                    },
+                    "x-when": {
+                      "srt.bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    },
+                    "description": "Should be independent of path A (e.g. a different network or zone)."
+                  }
+                }
+              },
+              "payload": {
+                "type": "object",
+                "title": "Expected payload",
+                "description": "What the incoming stream carries, per path. The receiver decodes and normalizes it to the output format below; the orchestrator uses the bitrate to reserve bandwidth.",
+                "properties": {
+                  "pathA": {
+                    "type": "object",
+                    "title": "Stream",
+                    "x-group": "paths",
+                    "required": [
+                      "bitrateMbps"
+                    ],
+                    "properties": {
+                      "bitrateMbps": {
+                        "type": "number",
+                        "title": "Bitrate (Mbit/s)",
+                        "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                        "minimum": 0.1,
+                        "maximum": 10000
+                      },
+                      "container": {
+                        "type": "string",
+                        "title": "Container",
+                        "enum": [
+                          "mpeg-ts",
+                          "rtp",
+                          "flv"
+                        ],
+                        "default": "mpeg-ts"
+                      },
+                      "videoCodec": {
+                        "type": "string",
+                        "title": "Video codec",
+                        "enum": [
+                          "h264",
+                          "hevc",
+                          "jpeg-xs",
+                          "jpeg2000",
+                          "av1",
+                          "uncompressed"
+                        ],
+                        "default": "h264"
+                      },
+                      "audioCodec": {
+                        "type": "string",
+                        "title": "Audio codec",
+                        "enum": [
+                          "aac",
+                          "mpeg-l2",
+                          "ac3",
+                          "eac3",
+                          "opus",
+                          "pcm"
+                        ],
+                        "default": "aac"
+                      }
+                    },
+                    "x-title-when": [
+                      {
+                        "when": {
+                          "srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "title": "Path A"
+                      }
+                    ]
+                  },
+                  "pathB": {
+                    "type": "object",
+                    "title": "Path B",
+                    "x-group": "paths",
+                    "required": [
+                      "bitrateMbps"
+                    ],
+                    "properties": {
+                      "bitrateMbps": {
+                        "type": "number",
+                        "title": "Bitrate (Mbit/s)",
+                        "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                        "minimum": 0.1,
+                        "maximum": 10000
+                      },
+                      "container": {
+                        "type": "string",
+                        "title": "Container",
+                        "enum": [
+                          "mpeg-ts",
+                          "rtp",
+                          "flv"
+                        ],
+                        "default": "mpeg-ts"
+                      },
+                      "videoCodec": {
+                        "type": "string",
+                        "title": "Video codec",
+                        "enum": [
+                          "h264",
+                          "hevc",
+                          "jpeg-xs",
+                          "jpeg2000",
+                          "av1",
+                          "uncompressed"
+                        ],
+                        "default": "h264"
+                      },
+                      "audioCodec": {
+                        "type": "string",
+                        "title": "Audio codec",
+                        "enum": [
+                          "aac",
+                          "mpeg-l2",
+                          "ac3",
+                          "eac3",
+                          "opus",
+                          "pcm"
+                        ],
+                        "default": "aac"
+                      }
+                    },
+                    "x-when": {
+                      "srt.bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    }
+                  }
+                },
+                "x-audience": "both"
+              },
+              "video": {
+                "type": "object",
+                "title": "Output video format",
+                "properties": {
+                  "frameSize": {
+                    "type": "string",
+                    "title": "Expected frame size",
+                    "enum": [
+                      "1280x720",
+                      "1920x1080",
+                      "3840x2160"
+                    ],
+                    "default": "1920x1080"
+                  },
+                  "rate": {
+                    "type": "string",
+                    "title": "Expected frame rate",
+                    "enum": [
+                      "25",
+                      "29.97",
+                      "50",
+                      "59.94",
+                      "60"
+                    ],
+                    "default": "50"
+                  },
+                  "scan": {
+                    "type": "string",
+                    "title": "Scan",
+                    "enum": [
+                      "progressive",
+                      "interlaced"
+                    ],
+                    "default": "progressive"
+                  },
+                  "colorspace": {
+                    "type": "string",
+                    "title": "Colorspace",
+                    "enum": [
+                      "BT709",
+                      "BT2020",
+                      "BT2100"
+                    ],
+                    "default": "BT709"
+                  },
+                  "transfer": {
+                    "type": "string",
+                    "title": "Transfer",
+                    "enum": [
+                      "SDR",
+                      "HLG",
+                      "PQ"
+                    ],
+                    "default": "SDR"
+                  }
+                },
+                "description": "Format the receiver normalizes to; becomes the MXL video flow definition.",
+                "x-audience": "function"
+              },
+              "audio": {
+                "type": "object",
+                "title": "Output audio",
+                "properties": {
+                  "channels": {
+                    "type": "integer",
+                    "title": "Channels",
+                    "minimum": 1,
+                    "maximum": 64,
+                    "default": 2
+                  }
+                },
+                "description": "Channel count published on the audio flow.",
+                "x-audience": "function"
+              },
+              "timing": {
+                "type": "object",
+                "title": "Timing",
+                "properties": {
+                  "maxLatencyMs": {
+                    "type": "number",
+                    "title": "Latency budget (ms)",
+                    "description": "Maximum delay from stream arrival to published grain; the orchestrator sizes buffers within it.",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 20
+                  }
+                },
+                "x-audience": "function"
+              }
+            }
+          }
+        },
+        "protocols": [
+          "srt",
+          "zixi",
+          "rist",
+          "st2022-7",
+          "rtp",
+          "udp",
+          "rtmp"
+        ]
+      },
+      {
+        "id": "acquisition.decoder",
+        "category": "acquisition",
+        "name": "Decoder",
+        "plural": "Decoders",
+        "description": "Edge function that receives a compressed contribution stream (SRT, RIST, MPEG-TS, ST 2110-22 JPEG XS, RTMP, WebRTC), decodes it, timestamps each grain at ingress and publishes the essence as MXL flows.",
+        "ports": [
+          {
+            "id": "in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "external"
+          },
+          {
+            "id": "in.audio",
+            "direction": "in",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "external"
+          },
+          {
+            "id": "in.anc",
+            "direction": "in",
+            "essence": "data",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "external"
+          },
+          {
+            "id": "out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl"
+          },
+          {
+            "id": "out.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl"
+          },
+          {
+            "id": "out.anc",
+            "direction": "out",
+            "essence": "data",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "mxl"
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "required": [
+              "transport"
+            ],
+            "properties": {
+              "transport": {
+                "type": "string",
+                "title": "Transport",
+                "description": "Contribution format received. Generic models usually fix this.",
+                "enum": [
+                  "srt",
+                  "rist",
+                  "rtp-ts",
+                  "udp-ts",
+                  "st2110-22",
+                  "rtmp",
+                  "webrtc"
+                ],
+                "default": "srt"
+              },
+              "protection": {
+                "type": "boolean",
+                "title": "Seamless protection",
+                "description": "Receive two independent paths and switch without loss (SRT backup/bonding or ST 2022-7, chosen by the orchestrator). The orchestrator provides the paths.",
+                "default": false
+              },
+              "srt": {
+                "type": "object",
+                "title": "SRT / RIST",
+                "properties": {
+                  "latencyMs": {
+                    "type": "integer",
+                    "title": "Latency (ms)",
+                    "minimum": 20,
+                    "maximum": 8000,
+                    "default": 120,
+                    "description": "SRT/RIST recovery window agreed with the remote party."
+                  },
+                  "streamId": {
+                    "type": "string",
+                    "title": "Stream id"
+                  },
+                  "passphrase": {
+                    "type": "string",
+                    "title": "Passphrase",
+                    "format": "secret-ref"
+                  }
+                }
+              },
+              "program": {
+                "type": "object",
+                "title": "Program selection (MPEG-TS)",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "title": "Program number",
+                    "minimum": 0,
+                    "description": "0 = first program.",
+                    "default": 0
+                  },
+                  "audioTracks": {
+                    "type": "array",
+                    "title": "Audio tracks",
+                    "description": "Tracks to decode, in output order, by index or language, e.g. \"0\", \"eng\". Empty = all.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                }
+              },
+              "video": {
+                "type": "object",
+                "title": "Video output",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "Decode video",
+                    "default": true
+                  },
+                  "codec": {
+                    "type": "string",
+                    "title": "Expected codec",
+                    "enum": [
+                      "auto",
+                      "h264",
+                      "hevc",
+                      "jpeg-xs",
+                      "jpeg2000",
+                      "av1"
+                    ],
+                    "default": "auto"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "title": "Output frame size",
+                    "enum": [
+                      "source",
+                      "1280x720",
+                      "1920x1080",
+                      "3840x2160"
+                    ],
+                    "default": "source"
+                  },
+                  "deinterlace": {
+                    "type": "string",
+                    "title": "Deinterlace",
+                    "enum": [
+                      "off",
+                      "auto"
+                    ],
+                    "default": "off"
+                  }
+                }
+              },
+              "audio": {
+                "type": "object",
+                "title": "Audio output",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "Decode audio",
+                    "default": true
+                  },
+                  "channels": {
+                    "type": "integer",
+                    "title": "Output channels",
+                    "minimum": 1,
+                    "maximum": 64,
+                    "default": 2
+                  },
+                  "channelMap": {
+                    "type": "array",
+                    "title": "Channel map",
+                    "description": "Decoded channel index for each output channel (empty = in track order).",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "default": []
+                  }
+                }
+              },
+              "anc": {
+                "type": "object",
+                "title": "Ancillary data",
+                "properties": {
+                  "captions": {
+                    "type": "boolean",
+                    "title": "Extract captions (CEA-608/708) to ANC",
+                    "default": true
+                  },
+                  "scte35ToScte104": {
+                    "type": "boolean",
+                    "title": "Convert SCTE-35 cues to SCTE-104",
+                    "default": false
+                  },
+                  "timecode": {
+                    "type": "boolean",
+                    "title": "Extract timecode",
+                    "default": true
+                  }
+                }
+              },
+              "timing": {
+                "type": "object",
+                "title": "Ingress timing",
+                "properties": {
+                  "timestampSource": {
+                    "type": "string",
+                    "title": "Grain timestamp from",
+                    "description": "stream: derived from PCR/PTS; arrival: ingress time.",
+                    "enum": [
+                      "stream",
+                      "arrival"
+                    ],
+                    "default": "stream"
+                  },
+                  "maxLatencyMs": {
+                    "type": "number",
+                    "title": "Latency budget (ms)",
+                    "description": "Maximum delay from stream arrival to decoded grain (excluding the SRT latency); the orchestrator sizes buffers within it.",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 500
+                  }
+                }
+              },
+              "errors": {
+                "type": "object",
+                "title": "Errors and loss",
+                "properties": {
+                  "concealment": {
+                    "type": "boolean",
+                    "title": "Conceal decode errors",
+                    "default": true
+                  },
+                  "onLoss": {
+                    "type": "string",
+                    "title": "On stream loss",
+                    "enum": [
+                      "freeze",
+                      "black",
+                      "stop-flows"
+                    ],
+                    "default": "freeze"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "acquisition.synchronizer",
+        "category": "acquisition",
+        "name": "Synchronizer",
+        "plural": "Synchronizers",
+        "description": "Aligns asynchronous sources to a common time base: frame synchronisation, fixed or matched delay across channels, audio/video alignment, and behaviour on signal loss.",
+        "ports": [
+          {
+            "id": "in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "0..n",
+            "arraySize": "channels",
+            "timeContext": "ch",
+            "side": "mxl"
+          },
+          {
+            "id": "in.audio",
+            "direction": "in",
+            "essence": "audio",
+            "cardinality": "0..n",
+            "arraySize": "channels",
+            "timeContext": "ch",
+            "side": "mxl"
+          },
+          {
+            "id": "out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..n",
+            "arraySize": "channels",
+            "timeContext": "out",
+            "side": "mxl"
+          },
+          {
+            "id": "out.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..n",
+            "arraySize": "channels",
+            "timeContext": "out",
+            "side": "mxl"
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "required": [
+              "channels",
+              "mode",
+              "reference"
+            ],
+            "properties": {
+              "channels": {
+                "type": "integer",
+                "title": "Channels",
+                "description": "Sources aligned together (each a video + audio bundle).",
+                "minimum": 1,
+                "maximum": 32,
+                "default": 1
+              },
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "description": "frame-sync: drop/repeat frames to lock to the reference; align: match all channels to the latest one (no drop/repeat); fixed-delay: hold each channel by a set delay.",
+                "enum": [
+                  "frame-sync",
+                  "align",
+                  "fixed-delay"
+                ],
+                "default": "frame-sync"
+              },
+              "reference": {
+                "type": "string",
+                "title": "Time reference",
+                "enum": [
+                  "facility-ptp",
+                  "channel-1",
+                  "free-run"
+                ],
+                "default": "facility-ptp"
+              },
+              "delay": {
+                "type": "object",
+                "title": "Delay",
+                "properties": {
+                  "targetMs": {
+                    "type": "number",
+                    "title": "Target / fixed delay (ms)",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 40
+                  },
+                  "maxAlignMs": {
+                    "type": "number",
+                    "title": "Max alignment window (ms)",
+                    "description": "Channels further apart than this are reported, not aligned.",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 500
+                  }
+                }
+              },
+              "frameRate": {
+                "type": "object",
+                "title": "Frame rate",
+                "properties": {
+                  "output": {
+                    "type": "string",
+                    "title": "Output frame rate",
+                    "enum": [
+                      "source",
+                      "25",
+                      "29.97",
+                      "50",
+                      "59.94",
+                      "60"
+                    ],
+                    "default": "source"
+                  },
+                  "conversion": {
+                    "type": "string",
+                    "title": "Conversion",
+                    "enum": [
+                      "drop-repeat",
+                      "blend",
+                      "motion-compensated"
+                    ],
+                    "default": "drop-repeat"
+                  }
+                }
+              },
+              "audio": {
+                "type": "object",
+                "title": "Audio",
+                "properties": {
+                  "lipSyncOffsetMs": {
+                    "type": "number",
+                    "title": "Audio offset (ms)",
+                    "description": "Positive delays audio relative to video.",
+                    "minimum": -1000,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "driftCorrection": {
+                    "type": "boolean",
+                    "title": "Correct clock drift (resample)",
+                    "default": true
+                  }
+                }
+              },
+              "loss": {
+                "type": "object",
+                "title": "On signal loss",
+                "properties": {
+                  "timeoutMs": {
+                    "type": "integer",
+                    "title": "Declare loss after (ms)",
+                    "minimum": 0,
+                    "maximum": 10000,
+                    "default": 200
+                  },
+                  "video": {
+                    "type": "string",
+                    "title": "Video",
+                    "enum": [
+                      "freeze",
+                      "black",
+                      "test-pattern"
+                    ],
+                    "default": "freeze"
+                  },
+                  "audio": {
+                    "type": "string",
+                    "title": "Audio",
+                    "enum": [
+                      "mute",
+                      "hold"
+                    ],
+                    "default": "mute"
+                  }
+                }
+              },
+              "timecode": {
+                "type": "string",
+                "title": "Timecode",
+                "enum": [
+                  "pass",
+                  "regenerate"
+                ],
+                "default": "pass"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "distribution.encoder",
+        "category": "distribution",
+        "name": "Encoder",
+        "plural": "Encoders",
+        "description": "Edge function that compresses MXL flows for delivery outside the facility (H.264/HEVC/AV1/JPEG XS/\u2026, carried over SRT, RIST, MPEG-TS, RTMP, ST 2110-22, or written to file).",
+        "ports": [
+          {
+            "id": "in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "mxl"
+          },
+          {
+            "id": "in.audio",
+            "direction": "in",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "mxl"
+          },
+          {
+            "id": "in.anc",
+            "direction": "in",
+            "essence": "data",
+            "cardinality": "0..1",
+            "timeContext": "in",
+            "side": "mxl"
+          },
+          {
+            "id": "out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "external"
+          },
+          {
+            "id": "out.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "external"
+          },
+          {
+            "id": "out.anc",
+            "direction": "out",
+            "essence": "data",
+            "cardinality": "0..1",
+            "timeContext": "out",
+            "side": "external"
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "required": [
+              "video",
+              "output"
+            ],
+            "properties": {
+              "video": {
+                "type": "object",
+                "title": "Video encoding",
+                "required": [
+                  "codec"
+                ],
+                "properties": {
+                  "codec": {
+                    "type": "string",
+                    "title": "Codec",
+                    "enum": [
+                      "h264",
+                      "hevc",
+                      "jpeg-xs",
+                      "jpeg2000",
+                      "av1"
+                    ],
+                    "default": "hevc"
+                  },
+                  "profile": {
+                    "type": "string",
+                    "title": "Profile",
+                    "description": "e.g. main10, high422; empty = codec default."
+                  },
+                  "chroma": {
+                    "type": "string",
+                    "title": "Chroma",
+                    "enum": [
+                      "4:2:0",
+                      "4:2:2",
+                      "4:4:4"
+                    ],
+                    "default": "4:2:0"
+                  },
+                  "bitDepth": {
+                    "type": "integer",
+                    "title": "Bit depth",
+                    "enum": [
+                      8,
+                      10,
+                      12
+                    ],
+                    "default": 10
+                  },
+                  "rateControl": {
+                    "type": "string",
+                    "title": "Rate control",
+                    "enum": [
+                      "cbr",
+                      "vbr",
+                      "capped-vbr"
+                    ],
+                    "default": "cbr"
+                  },
+                  "bitrateKbps": {
+                    "type": "integer",
+                    "title": "Bitrate (kbit/s)",
+                    "minimum": 100,
+                    "maximum": 2000000,
+                    "default": 20000
+                  },
+                  "gopFrames": {
+                    "type": "integer",
+                    "title": "GOP length (frames)",
+                    "description": "Ignored by intra-only codecs (JPEG XS/2000).",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 50
+                  },
+                  "bFrames": {
+                    "type": "integer",
+                    "title": "B-frames",
+                    "minimum": 0,
+                    "maximum": 16,
+                    "default": 0
+                  },
+                  "closedGop": {
+                    "type": "boolean",
+                    "title": "Closed GOP",
+                    "default": true
+                  },
+                  "latency": {
+                    "type": "string",
+                    "title": "Latency mode",
+                    "enum": [
+                      "normal",
+                      "low",
+                      "ultra-low"
+                    ],
+                    "default": "low"
+                  },
+                  "scale": {
+                    "type": "string",
+                    "title": "Output frame size",
+                    "enum": [
+                      "source",
+                      "1280x720",
+                      "1920x1080",
+                      "3840x2160"
+                    ],
+                    "default": "source"
+                  }
+                }
+              },
+              "audio": {
+                "type": "object",
+                "title": "Audio encoding",
+                "properties": {
+                  "codec": {
+                    "type": "string",
+                    "title": "Codec",
+                    "enum": [
+                      "aac-lc",
+                      "he-aac",
+                      "opus",
+                      "mpeg-l2",
+                      "ac3",
+                      "eac3",
+                      "pcm"
+                    ],
+                    "default": "aac-lc"
+                  },
+                  "bitrateKbps": {
+                    "type": "integer",
+                    "title": "Bitrate per track (kbit/s)",
+                    "minimum": 32,
+                    "maximum": 1536,
+                    "default": 192
+                  },
+                  "tracks": {
+                    "type": "array",
+                    "title": "Tracks",
+                    "description": "Each track: channels taken from the input and a language tag.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "channels": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "language": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "default": [
+                      {
+                        "channels": [
+                          0,
+                          1
+                        ],
+                        "language": "und"
+                      }
+                    ]
+                  }
+                }
+              },
+              "ancillary": {
+                "type": "object",
+                "title": "Ancillary data",
+                "properties": {
+                  "captions": {
+                    "type": "string",
+                    "title": "Captions",
+                    "enum": [
+                      "none",
+                      "cea-608-708"
+                    ],
+                    "default": "cea-608-708"
+                  },
+                  "scte35": {
+                    "type": "boolean",
+                    "title": "Pass SCTE-35 / SCTE-104 cues",
+                    "default": false
+                  },
+                  "timecode": {
+                    "type": "boolean",
+                    "title": "Embed timecode",
+                    "default": true
+                  }
+                }
+              },
+              "output": {
+                "type": "object",
+                "title": "Output",
+                "required": [
+                  "transport"
+                ],
+                "properties": {
+                  "transport": {
+                    "type": "string",
+                    "title": "Transport",
+                    "enum": [
+                      "srt",
+                      "rist",
+                      "st2110-22",
+                      "rtp-ts",
+                      "udp-ts",
+                      "rtmp",
+                      "file"
+                    ],
+                    "default": "srt"
+                  },
+                  "container": {
+                    "type": "string",
+                    "title": "Container",
+                    "enum": [
+                      "mpeg-ts",
+                      "rtp",
+                      "fmp4",
+                      "mxf"
+                    ],
+                    "default": "mpeg-ts"
+                  },
+                  "srt": {
+                    "type": "object",
+                    "title": "SRT / RIST",
+                    "properties": {
+                      "latencyMs": {
+                        "type": "integer",
+                        "title": "Latency (ms)",
+                        "minimum": 20,
+                        "maximum": 8000,
+                        "default": 120
+                      },
+                      "streamId": {
+                        "type": "string",
+                        "title": "Stream id"
+                      },
+                      "passphrase": {
+                        "type": "string",
+                        "title": "Passphrase",
+                        "format": "secret-ref"
+                      }
+                    }
+                  },
+                  "ts": {
+                    "type": "object",
+                    "title": "MPEG-TS",
+                    "properties": {
+                      "serviceName": {
+                        "type": "string",
+                        "title": "Service name"
+                      },
+                      "programNumber": {
+                        "type": "integer",
+                        "title": "Program number",
+                        "minimum": 1,
+                        "default": 1
+                      },
+                      "muxRateKbps": {
+                        "type": "integer",
+                        "title": "Mux rate (kbit/s, 0 = VBR)",
+                        "minimum": 0,
+                        "default": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

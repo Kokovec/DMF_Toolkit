@@ -1,5 +1,8 @@
 # Distribution — Primitives (draft for review)
 
+> Design rules and their history: [`../design-rules.md`](../design-rules.md). This document holds the
+> detailed definitions for this category's primitives.
+
 Status: draft 2026-10-10. Source of truth: `src/model/primitives.json`. Hierarchy and
 conventions: see `acquisition.md`.
 

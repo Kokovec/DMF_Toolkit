@@ -1,5 +1,8 @@
 # Configurator ↔ Orchestrator Contract
 
+> Design rules and their history: [`design-rules.md`](design-rules.md). This document holds the
+> detail of the configurator ↔ orchestrator contract.
+
 Status: agreed 2026-10-11 (user brief). Applies to schemas, API contracts, data structures and UI.
 
 ## Roles

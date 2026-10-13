@@ -1,5 +1,8 @@
 # Media Primitive & Published Graph — Spec (v1 draft)
 
+> **Historical document.** Kept for context; much of it has been superseded. The current design
+> rules live in [`design-rules.md`](design-rules.md) (rules by topic + decision log).
+
 > **Terminology update (2026-10-10):** what this document calls a "primitive" (a catalog entry
 > with image, ports, parameters…) is now a **vendor module** (`VendorModule`, `spec.modules`,
 > `/api/modules`). *Primitives* are the base types per category (`src/model/primitives.json`,

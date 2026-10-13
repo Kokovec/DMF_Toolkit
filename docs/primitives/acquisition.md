@@ -1,5 +1,8 @@
 # Acquisition — Primitives (draft for review)
 
+> Design rules and their history: [`../design-rules.md`](../design-rules.md). This document holds the
+> detailed definitions for this category's primitives.
+
 Status: draft 2026-10-11 (rev 9: parameters follow the protocol: SRT session + network constraints; other protocols blank for now). Source of truth: `src/model/primitives.json`.
 
 ## Where primitives sit

@@ -1,5 +1,8 @@
 # Orchestration Model — Design Proposal (v0)
 
+> **Historical document.** Kept for context; much of it has been superseded. The current design
+> rules live in [`design-rules.md`](design-rules.md) (rules by topic + decision log).
+
 > **Superseded in part (2026-10-09):** the node kinds, ports, essences, catalog and workload
 > shapes (§3–§6) are replaced by `docs/media-primitive.md` (v1). §1–§2 (layering, lifecycle),
 > §7 (build plan) and §8 (storage) still apply; §8 tables are now `primitives` (was `function_types`).

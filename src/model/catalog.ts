@@ -1,14 +1,13 @@
 import { catalogProblems, coreSchemaFor, portChoiceOf, portsFor, protocolsFor } from './modules'
 import { getPrimitive } from './primitives'
+import { EXTERNAL_TRANSPORTS, TRANSPORT_LABELS } from './vocabulary'
 import { applies, checkParameterSchema, getPath, leafPaths, schemaAt } from './schema'
 import {
   API_VERSION,
   CARDINALITIES,
   DEPENDENCY_KINDS,
   ESSENCES,
-  EXTERNAL_TRANSPORTS,
   ID_RE,
-  TRANSPORT_LABELS,
   type Essence,
   type JsonSchema,
   type ModuleCatalog,
@@ -20,12 +19,7 @@ import {
   type Rational,
 } from './types'
 
-// Media types the tool knows, by essence (ports may also declare others).
-export const KNOWN_FORMATS: Record<Essence, string[]> = {
-  video: ['video/v210', 'video/v210a'],
-  audio: ['audio/float32'],
-  data: ['video/smpte291'],
-}
+export { KNOWN_FORMATS } from './vocabulary'
 
 // A set of vendor modules, all versions. get(id) without a version returns the latest.
 export class Catalog {

@@ -35,7 +35,8 @@ Detail docs:
 ## Code map
 
 - `src/model/types.ts`: all data types (`PrimitiveDef`, `VendorModule`, `ModuleCatalog`, `PortDef`, `WorkloadDescription`, `FlowDef`, `JsonSchema` with `x-*` extensions; `apiVersion dmf-toolkit/v1alpha2`).
-- `src/model/primitives.json` + `primitives.ts`: categories and primitives (port templates, protocols, core parameter schemas); `checkPrimitiveLibrary`.
+- `src/model/primitives.json` + `primitives.ts`: **the primitive library**, a versioned file (bump `metadata.version` on every change; the server refuses otherwise). Holds the vocabulary, categories and primitives (port templates, protocols, core parameter schemas with `x-*` keywords incl. `x-flow`). `checkPrimitiveLibrary` validates it.
+- `src/model/vocabulary.ts`: transports/labels/aliases (`transportOf`), `KNOWN_FORMATS`, External device kinds and reference kinds, all from the library's `vocabulary`.
 - `src/model/modules.ts`:
   - module identity: `vendorSlug`, `nextModuleId`, `catalogProblems`;
   - ports from primitive + choices: `portsFor`, `portChoiceOf`;
@@ -51,9 +52,9 @@ Detail docs:
   - canvas ↔ workload: `toWorkload` / `fromWorkload`;
   - wiring: `planConnection`, `edgesFor`, `pruneWires`, `rebind`;
   - checks: `checkWorkload`, `publishProblems`;
-  - desired state: `flowsOf`, `toPublished`.
-- `src/model/externals.ts`: External devices and reference kinds. `src/model/uuid.ts`: UUID v5 for flow ids.
-- `server/db.ts` (schema v4, auto-migrates), `server/app.ts` (REST: `/api/modules`, `/api/parts`, `/api/catalogs`, `/api/workloads`, `GET /api/workloads/:id/published`), `server/main.ts`.
+  - desired state: `flowsOf` (formats from `x-flow` tags, `parseRate`), `toPublished` (adds `libraryVersion`).
+- `src/model/externals.ts`: re-exports External devices from the vocabulary. `src/model/uuid.ts`: UUID v5 for flow ids.
+- `server/db.ts` (schema v5, auto-migrates; records the library version + hash at startup), `server/app.ts` (REST: `/api/library[/versions|/:version]`, `/api/modules`, `/api/parts`, `/api/catalogs`, `/api/workloads`, `GET /api/workloads/:id/published`), `server/main.ts`.
 - `src/api.ts`: API client, `refreshCatalog`, `useCatalog`.
 - `src/components/`:
   - `MediaNode.tsx`: nodes; collapsible MXL bundles; protocol labels.
@@ -73,6 +74,7 @@ Detail docs:
 - No auth yet.
 - Git:
   - branch `main`; repo-local identity Kokovec <6053105+Kokovec@users.noreply.github.com>;
-  - no remote (no gh CLI);
+  - remote `origin` = https://github.com/Kokovec/DMF_Toolkit (private), tracking `main`;
+  - gh CLI v2.101.0 in `~/.local/bin`, logged in as Kokovec;
   - `data/` (SQLite) is git-ignored;
   - commit only when the user asks.

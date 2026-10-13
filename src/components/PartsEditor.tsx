@@ -5,7 +5,6 @@ import { checkModule, deriveCapability, resolvePorts } from '../model/catalog'
 import { checkParameterSchema, defaultsFor, leafPaths } from '../model/schema'
 import {
   DEPENDENCY_KINDS,
-  TRANSPORT_LABELS,
   type CoreMapping,
   type ControlApiType,
   type Dependency,
@@ -22,6 +21,7 @@ import {
 } from '../model/types'
 import { coreSchemaFor, moduleFromPrimitive, moduleNumber, nextModuleId, portChoiceOf, portsFor, protocolsFor, settingsSchema, vendorSlug } from '../model/modules'
 import { getPrimitive, primitiveTree, roleLabel } from '../model/primitives'
+import { TRANSPORT_LABELS } from '../model/vocabulary'
 import { ModulePreview } from './MediaNode'
 import { SchemaForm } from './SchemaForm'
 

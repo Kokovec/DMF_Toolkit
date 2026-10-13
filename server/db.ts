@@ -1,16 +1,26 @@
 // Parts library + workload store on SQLite (node:sqlite). The schema sticks to
 // portable SQL (TEXT JSON documents, ISO timestamps) so it can move to Postgres.
+import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { Catalog } from '../src/model/catalog'
 import { catalogProblems } from '../src/model/modules'
-import { API_VERSION, type ModuleCatalog, type VendorModule, type WorkloadDescription } from '../src/model/types'
+import { PRIMITIVE_LIBRARY } from '../src/model/primitives'
+import { API_VERSION, type ModuleCatalog, type PrimitiveLibrary, type VendorModule, type WorkloadDescription } from '../src/model/types'
 
 // Bump when the schema or the stored document shapes change incompatibly.
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 
 const SCHEMA = `
+-- Every primitive library version this install has run with (the file lives in git).
+CREATE TABLE IF NOT EXISTS primitive_library (
+  version     TEXT PRIMARY KEY,
+  hash        TEXT NOT NULL,
+  document    TEXT NOT NULL,
+  loaded_at   TEXT NOT NULL
+);
+
 -- One catalog per vendor; its id prefixes every module type id.
 CREATE TABLE IF NOT EXISTS catalogs (
   id          TEXT PRIMARY KEY,
@@ -86,10 +96,39 @@ export class Store {
     const { n: tables } = this.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }
     if (tables > 0 && version === 2) this.migrateFrom2()
     if (tables > 0 && (version === 2 || version === 3)) this.migrateFrom3()
-    else if (tables > 0 && version !== SCHEMA_VERSION)
+    // v4 -> v5 only adds the primitive_library table (created by SCHEMA below).
+    else if (tables > 0 && version !== 4 && version !== SCHEMA_VERSION)
       throw new Error(`${path} has schema version ${version}, expected ${SCHEMA_VERSION}. It holds dev data only: delete it to reset.`)
     this.db.exec(SCHEMA)
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
+    this.recordLibrary(PRIMITIVE_LIBRARY)
+  }
+
+  // ---- Primitive library: a versioned file in git, recorded here on startup ----
+
+  // Records the library version shipped with this build. A changed file must carry a new version.
+  private recordLibrary(lib: PrimitiveLibrary) {
+    const document = JSON.stringify(lib)
+    const hash = createHash('sha256').update(document).digest('hex')
+    const row = this.db.prepare('SELECT hash FROM primitive_library WHERE version = ?').get(lib.metadata.version) as { hash: string } | undefined
+    if (row && row.hash !== hash)
+      throw new Error(
+        `src/model/primitives.json changed but its metadata.version (${lib.metadata.version}) did not. Bump the version.`,
+      )
+    if (!row)
+      this.db
+        .prepare('INSERT INTO primitive_library (version, hash, document, loaded_at) VALUES (?, ?, ?, ?)')
+        .run(lib.metadata.version, hash, document, new Date().toISOString())
+  }
+
+  libraryVersions() {
+    return this.db.prepare('SELECT version, hash, loaded_at AS loadedAt FROM primitive_library ORDER BY loaded_at DESC').all()
+  }
+
+  getLibrary(version: string): PrimitiveLibrary {
+    const row = this.db.prepare('SELECT document FROM primitive_library WHERE version = ?').get(version) as { document: string } | undefined
+    if (!row) throw new HttpError(404, `library version ${version} not found`)
+    return JSON.parse(row.document)
   }
 
   // v2 -> v3: catalog entries became vendor modules (table renamed); the generic catalog is gone.

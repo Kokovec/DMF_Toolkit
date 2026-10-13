@@ -1,7 +1,9 @@
 import type { Edge, Node } from '@xyflow/react'
-import { currentCatalog, KNOWN_FORMATS, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
+import { currentCatalog, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
 import { EXTERNALS } from './externals'
+import { KNOWN_FORMATS } from './vocabulary'
 import { settingsSchema } from './modules'
+import { PRIMITIVE_LIBRARY } from './primitives'
 import { defaultsFor, getPath, leafPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
 import {
@@ -12,6 +14,7 @@ import {
   type ExternalKind,
   type ExternalReference,
   type FlowDef,
+  type FlowField,
   type FlowFormat,
   type FlowOptions,
   type FunctionInstance,
@@ -430,23 +433,48 @@ export function workloadUid(meta: WorkloadMeta): string {
   return meta.uid ?? uuidV5(DMF_NAMESPACE, meta.id)
 }
 
-const RATES: Record<string, Rational> = {
-  '25': { num: 25, den: 1 },
-  '29.97': { num: 30000, den: 1001 },
-  '50': { num: 50, den: 1 },
-  '59.94': { num: 60000, den: 1001 },
-  '60': { num: 60, den: 1 },
+// A rate from a parameter value: "50" -> 50/1, "59.94" -> 60000/1001 (NTSC-style rates are
+// x/1.001), "60000/1001" -> as given. Undefined if the value isn't a rate (e.g. "source").
+export function parseRate(value: unknown): Rational | undefined {
+  const text = String(value ?? '').trim()
+  const frac = text.match(/^(\d+)\s*\/\s*(\d+)$/)
+  if (frac) return { num: Number(frac[1]), den: Number(frac[2]) }
+  const v = Number(text)
+  if (!text || !Number.isFinite(v) || v <= 0) return undefined
+  if (Number.isInteger(v)) return { num: v, den: 1 }
+  const ntsc = Math.round(v * 1.001) // 59.94 -> 60, 29.97 -> 30, 23.976 -> 24
+  if (Math.abs(ntsc / 1.001 - v) < 0.01) return { num: ntsc * 1000, den: 1001 }
+  return { num: Math.round(v * 1000), den: 1000 }
 }
 
-// Format of the flow written by `port`, from the writer's core parameters (e.g. a receiver's
-// output video format) and the workload defaults. Becomes the NMOS-style flow_def.json.
-function flowFormat(port: ResolvedPort, params: JsonValue, defaults: WorkloadDefaults): FlowFormat {
-  const v = (getPath(params, 'video') ?? {}) as { [k: string]: JsonValue }
-  const grainRate = RATES[String(v.rate)] ?? defaults.video.grainRate
+// The writer's parameter values tagged with x-flow, e.g. { frameSize: "3840x2160", grainRate: "59.94" }.
+function flowValues(schema: JsonSchema, params: JsonValue): Partial<Record<FlowField, JsonValue>> {
+  const out: Partial<Record<FlowField, JsonValue>> = {}
+  const walk = (node: JsonSchema, path: string) => {
+    const field = node['x-flow']
+    if (field) {
+      const v = getPath(params, path)
+      if (v !== undefined) out[field] = v
+    }
+    for (const [k, child] of Object.entries(node.properties ?? {})) walk(child, path ? `${path}.${k}` : k)
+  }
+  walk(schema, '')
+  return out
+}
+
+// Format of the flow written by `port`: the writer's parameters tagged with `x-flow` (e.g. a
+// receiver's output video format), else the workload defaults. Becomes the NMOS-style flow_def.json.
+function flowFormat(port: ResolvedPort, schema: JsonSchema, params: JsonValue, defaults: WorkloadDefaults): FlowFormat {
+  const v = flowValues(schema, params)
   const mediaType = port.formats[0] ?? KNOWN_FORMATS[port.essence][0]
+  const grainRate = parseRate(v.grainRate) ?? defaults.video.grainRate
   if (port.essence === 'audio') {
-    const channels = Number(getPath(params, 'audio.channels'))
-    return { mediaType, sampleRate: defaults.audio.sampleRate, channelCount: channels > 0 ? channels : defaults.audio.channelCount }
+    const channels = Number(v.channelCount)
+    return {
+      mediaType,
+      sampleRate: parseRate(v.sampleRate) ?? defaults.audio.sampleRate,
+      channelCount: channels > 0 ? channels : defaults.audio.channelCount,
+    }
   }
   if (port.essence === 'data') return { mediaType, grainRate }
   const [w, h] = String(v.frameSize ?? '').split('x').map(Number)
@@ -455,7 +483,7 @@ function flowFormat(port: ResolvedPort, params: JsonValue, defaults: WorkloadDef
     grainRate,
     frameWidth: w > 0 ? w : defaults.video.frameSize.width,
     frameHeight: h > 0 ? h : defaults.video.frameSize.height,
-    interlace: v.scan === 'interlaced' ? 'interlaced' : 'progressive',
+    interlace: String(v.interlace ?? '').startsWith('interlaced') ? 'interlaced' : 'progressive',
     colorspace: typeof v.colorspace === 'string' ? v.colorspace : defaults.video.colorspace,
     ...(typeof v.transfer === 'string' ? { transfer: v.transfer } : {}),
   }
@@ -483,7 +511,7 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
         essence: port.essence,
         writer,
         readers,
-        format: flowFormat(port, f.parameters, doc.spec.defaults),
+        format: flowFormat(port, prim.parameters.schema, f.parameters, doc.spec.defaults),
         historyMs: opts.historyMs ?? historyMs,
         discovery: {
           register: opts.register ?? f.discovery?.register ?? !!prim.control.nmos,
@@ -510,7 +538,7 @@ export function toPublished(doc: WorkloadDescription, revision: number, cat: Cat
   })
   return {
     ...rest,
-    metadata: { ...doc.metadata, uid: workloadUid(doc.metadata), revision },
+    metadata: { ...doc.metadata, uid: workloadUid(doc.metadata), revision, libraryVersion: PRIMITIVE_LIBRARY.metadata.version },
     spec: { ...doc.spec, functions, flows: flowsOf(doc, cat) },
   }
 }

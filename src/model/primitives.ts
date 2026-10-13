@@ -2,7 +2,7 @@
 // models (MediaPrimitive entries in a catalog) name their primitive in `role`.
 import primitivesJson from './primitives.json'
 import { checkParameterSchema, defaultsFor, validateValue } from './schema'
-import { API_VERSION, CARDINALITIES, ESSENCES, EXTERNAL_TRANSPORTS, ID_RE, type CategoryDef, type PrimitiveDef, type PrimitiveLibrary } from './types'
+import { API_VERSION, CARDINALITIES, ESSENCES, FLOW_FIELDS, ID_RE, type CategoryDef, type JsonSchema, type PrimitiveDef, type PrimitiveLibrary } from './types'
 
 // JSON literal types are too loose to assert directly; checkPrimitiveLibrary validates it (server start, tests).
 export const PRIMITIVE_LIBRARY = primitivesJson as unknown as PrimitiveLibrary
@@ -35,6 +35,30 @@ export function roleLabel(role: string): string {
 export function checkPrimitiveLibrary(lib: PrimitiveLibrary = PRIMITIVE_LIBRARY): string[] {
   if (lib?.apiVersion !== API_VERSION || lib.kind !== 'PrimitiveLibrary') return ['not a PrimitiveLibrary document']
   const errors: string[] = []
+  if (!lib.metadata?.version) errors.push('metadata.version is required (bump it on every change)')
+  // Vocabulary
+  const v = lib.spec.vocabulary
+  if (!v) return [...errors, 'spec.vocabulary is required']
+  const EXTERNAL_TRANSPORTS = v.transports.map((t) => t.id)
+  const names = new Set<string>()
+  for (const t of v.transports)
+    for (const n of [t.id, t.label, ...(t.aliases ?? [])]) {
+      if (names.has(n)) errors.push(`vocabulary: transport name "${n}" is used twice`)
+      names.add(n)
+    }
+  for (const t of v.transports) if (!ID_RE.test(t.id)) errors.push(`vocabulary: transport id "${t.id}" is invalid`)
+  for (const e of ESSENCES) if (!v.formats?.[e]?.length) errors.push(`vocabulary: formats for ${e} are required`)
+  const kinds = new Set<string>()
+  for (const x of v.externals) {
+    if (!ID_RE.test(x.kind) || kinds.has(x.kind)) errors.push(`vocabulary: external kind "${x.kind}" must be unique and valid`)
+    kinds.add(x.kind)
+    if (!['in', 'out'].includes(x.direction) || !ESSENCES.includes(x.essence)) errors.push(`vocabulary: external ${x.kind}: invalid direction or essence`)
+  }
+  const refs = new Set<string>()
+  for (const r of v.references) {
+    if (!ID_RE.test(r.id) || refs.has(r.id)) errors.push(`vocabulary: reference kind "${r.id}" must be unique and valid`)
+    refs.add(r.id)
+  }
   const cats = new Set<string>()
   for (const c of lib.spec.categories) {
     if (!ID_RE.test(c.id) || cats.has(c.id)) errors.push(`category ${c.id}: id must be unique, lowercase letters, digits, . _ -`)
@@ -74,8 +98,13 @@ export function checkPrimitiveLibrary(lib: PrimitiveLibrary = PRIMITIVE_LIBRARY)
     if (p.ports.filter((t) => t.essenceOptions?.length).length > 1) errors.push(`${at}: at most one port may offer essence options`)
     if (p.protocols?.some((x) => !EXTERNAL_TRANSPORTS.includes(x))) errors.push(`${at}: unknown protocol in protocols`)
     for (const [k, s] of Object.entries(p.parameters.schema.properties ?? {}))
-      if (s['x-protocols']?.some((x) => !EXTERNAL_TRANSPORTS.includes(x as never)))
+      if (s['x-protocols']?.some((x) => !EXTERNAL_TRANSPORTS.includes(x)))
         errors.push(`${at}: parameter ${k}: unknown protocol in x-protocols`)
+    const walk = (node: JsonSchema, path: string) => {
+      if (node['x-flow'] && !FLOW_FIELDS.includes(node['x-flow'])) errors.push(`${at}: ${path}: unknown x-flow "${node['x-flow']}"`)
+      for (const [k, child] of Object.entries(node.properties ?? {})) walk(child, path ? `${path}.${k}` : k)
+    }
+    walk(p.parameters.schema, '')
   }
   return errors
 }

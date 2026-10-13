@@ -37,6 +37,7 @@ brief maps to a field:
 | **Placement / constraints**: host/cluster, affinity, on-prem vs cloud, licensing | `functions[].placement` (`site`, `cluster`, `environment`, `with`, `apart`, `licensing`) | Inspector → function → Placement constraints |
 | **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = module declares NMOS | Inspector → function → Discovery; Flow panel |
 | Domain | `functions[].domain`, `spec.domains[]` | Inspector → function → MXL domain |
+| Library version | `metadata.libraryVersion`: the primitive library the state was designed against; fetch it from `GET /api/library/:version` | automatic |
 
 These are **requirements and constraints, not decisions**: e.g. `placement.site` is a
 preference, `resources` is what the vendor needs, and `expectations.resilience: "1+1"` says

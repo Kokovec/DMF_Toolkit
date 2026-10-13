@@ -51,6 +51,20 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 - **R3.4 Type id = `<catalog>.<primitive>.<number>`**, numbered automatically with the next free
   number for that vendor and primitive (e.g. `acme-media.receiver.2`). *Duplicate* gets a new
   number; *New version* keeps it. *Enforced by:* `nextModuleId`, `catalogProblems`.
+- **R3.6 Three layers: engine in code, vocabulary in the library, instances in the database.**
+  - *Engine* (code): what the rule keywords mean, wiring rules, conformance, identity, publish
+    checks, flow derivation.
+  - *Primitive library* (`src/model/primitives.json`): categories, primitives and the shared
+    **vocabulary** (protocols with labels/aliases, MXL formats, External device kinds, reference
+    kinds). New protocols, formats or device kinds need a library change only, no code.
+    *Loaded by:* `src/model/vocabulary.ts`.
+  - *Database*: vendor catalogs and modules, workloads.
+- **R3.7 The primitive library is a versioned file in git, not editable in the UI.** It's the
+  shared language with the orchestrator, so it changes deliberately and under review.
+  `metadata.version` must be bumped on every change. The server records each version in the
+  database at startup, refuses a changed file with an unchanged version, and serves it at
+  `GET /api/library` (and `/api/library/:version`). Published workloads carry `libraryVersion`.
+  *Enforced by:* `checkPrimitiveLibrary`, `Store.recordLibrary` (`server/db.ts`).
 - **R3.5 Module versions are immutable once a saved workload uses them.** Changes go into a new
   version; instances can upgrade. *Enforced by:* `server/db.ts` (`isReferenced`).
 
@@ -104,8 +118,11 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
   **reference** (NMOS id, SDP name/address, SRT party, ZIXI stream, RTMP stream, NDI name).
   External devices connect only to an edge function's external port.
 - **R6.6 Every MXL output that's read becomes a published flow** with a stable UUID
-  (`uuidV5(workload uid, writer)`), writer, readers, domain, an NMOS-style format derived from the
-  writer's settings and workload defaults, history depth and discovery metadata.
+  (`uuidV5(workload uid, writer)`), writer, readers, domain, an NMOS-style format, history depth
+  and discovery metadata. The format comes from the writer's parameters tagged **`x-flow`**
+  (frameSize, grainRate, interlace, colorspace, transfer, channelCount, sampleRate), else the
+  workload defaults; no parameter names are hard-coded. Rates parse generically ("59.94" →
+  60000/1001).
   *Enforced by:* `flowsOf` (`workload.ts`).
 - **R6.7 A port can have two paths:**
   - **per module:** a 2022-7 receiver gets legs `.a` / `.b` (`dualFor`);
@@ -139,7 +156,7 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 ## 9. Storage and deployment of the tool
 
 - **R9.1 One install per customer** (shared by that customer's team): library server + SQLite
-  (`data/`, git-ignored). Schema migrations run automatically (now schema v4).
+  (`data/`, git-ignored). Schema migrations run automatically (now schema v5).
 - **R9.2 Dark theme only.**
 
 ---
@@ -171,6 +188,8 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 | 2026-10-11 | Incoming stream bitrate is required, per path, in Expected payload | Moved from network constraints |
 | 2026-10-11 | Bonding adds a second input to the node (SRT A / SRT B) | R6.7 |
 | 2026-10-13 | Design rules consolidated into this document | |
+| 2026-10-13 | Engine in code, vocabulary in the library, instances in the database. Protocols, MXL formats, External device kinds and reference kinds moved into the library's `vocabulary`; flow formats come from `x-flow` tags | R3.6, R6.6 |
+| 2026-10-13 | The primitive library stays a versioned file in git (not editable in the UI), recorded in the database at startup (schema v5), served at `/api/library`; published workloads carry `libraryVersion` | R3.7 |
 
 ## Open questions
 

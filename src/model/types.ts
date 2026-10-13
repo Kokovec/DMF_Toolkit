@@ -16,49 +16,14 @@ export type Cardinality = '1' | '0..1' | '0..n' | '1..n'
 export const CARDINALITIES: Cardinality[] = ['1', '0..1', '0..n', '1..n']
 
 // IP-based only: the facility has no baseband (SDI) signals.
-// Transports of external ports (streams entering or leaving the facility). Inside the facility,
-// between functions, media only travels as MXL flows.
-export type ExternalTransport =
-  | 'srt'
-  | 'zixi'
-  | 'rist'
-  | 'st2022-7'
-  | 'rtp'
-  | 'udp' // raw UDP (e.g. MPEG-TS over UDP): no packet recovery
-  | 'rtmp'
-  | 'st2110'
-  | 'ndi'
-  | 'file'
-  | 'tams'
-export const EXTERNAL_TRANSPORTS: ExternalTransport[] = ['srt', 'zixi', 'rist', 'st2022-7', 'rtp', 'udp', 'rtmp', 'st2110', 'ndi', 'file', 'tams']
-export const TRANSPORT_LABELS: Record<ExternalTransport, string> = {
-  srt: 'SRT',
-  zixi: 'ZIXI',
-  rist: 'RIST',
-  'st2022-7': '2022-7',
-  rtp: 'RTP',
-  udp: 'Raw UDP',
-  rtmp: 'RTMP',
-  st2110: 'ST 2110',
-  ndi: 'NDI',
-  file: 'File',
-  tams: 'TAMS',
-}
+// Transports of external ports (streams entering or leaving the facility), by id, e.g. "srt".
+// The list, labels and aliases are data: the `vocabulary` of the primitive library
+// (src/model/vocabulary.ts). Inside the facility, between functions, media only travels as MXL.
+export type ExternalTransport = string
 export type Transport = 'mxl' | { external: ExternalTransport }
 
-// A parameter value naming a protocol ("Raw UDP", "2022-7", or an id like "udp-ts") -> transport id.
-// (JPEG XS is a codec, not a protocol: ST 2110-22 carries it over the ST 2110 / RTP family.)
-const TRANSPORT_ALIASES: Record<string, ExternalTransport> = {
-  ...Object.fromEntries(Object.entries(TRANSPORT_LABELS).map(([id, label]) => [label, id as ExternalTransport])),
-  'st2110-22': 'st2110',
-  ipmx: 'st2110',
-  'rtp-ts': 'rtp',
-  'udp-ts': 'udp',
-}
-export function transportOf(value: unknown): ExternalTransport | undefined {
-  const v = String(value)
-  return TRANSPORT_ALIASES[v] ?? (EXTERNAL_TRANSPORTS.includes(v as ExternalTransport) ? (v as ExternalTransport) : undefined)
-}
+export const FLOW_FIELDS = ['frameSize', 'grainRate', 'interlace', 'colorspace', 'transfer', 'channelCount', 'sampleRate'] as const
+export type FlowField = (typeof FLOW_FIELDS)[number]
 
 export type Interlace = 'progressive' | 'interlaced_tff' | 'interlaced_bff'
 export type Colorspace = 'BT709' | 'BT2020' | 'BT2100'
@@ -116,6 +81,8 @@ export type JsonSchema = {
   'x-title-when'?: { when: Record<string, (string | number | boolean)[]>; title: string }[]
   // Consecutive sibling objects with the same group are laid out together (e.g. Path A | Path B).
   'x-group'?: string
+  // This parameter defines part of the MXL flow format written by the function's outputs.
+  'x-flow'?: FlowField
 }
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
@@ -259,10 +226,10 @@ export type FunctionInstance = {
 }
 
 // Canvas-only devices outside the facility (not deployed).
-export type ExternalKind = 'camera' | 'microphone' | 'source' | 'destination'
+export type ExternalKind = string // vocabulary.externals[].kind
 // Logical identity of what is on the other end of an edge function. The orchestrator resolves it
 // to addresses, SDP files and connections.
-export type ExternalRefKind = 'nmos' | 'sdp' | 'srt' | 'zixi' | 'rtmp' | 'ndi'
+export type ExternalRefKind = string // vocabulary.references[].id
 export type ExternalReference = {
   kind: ExternalRefKind
   value: string // NMOS sender/receiver id, SDP name/address, remote SRT/RIST host:port, Zixi stream, RTMP stream, NDI name
@@ -283,7 +250,8 @@ export type WorkloadDescription = {
   kind: 'MediaWorkload'
   // description = the workflow intent, e.g. "SRT ingress -> MXL -> switcher + multiviewer"
   // uid = stable identity of this workload (namespace for flow ids)
-  metadata: { id: string; uid?: string; name: string; description?: string; revision?: number }
+  // libraryVersion = primitive library version the published state was designed against
+  metadata: { id: string; uid?: string; name: string; description?: string; revision?: number; libraryVersion?: string }
   spec: {
     defaults: WorkloadDefaults
     domains: { id: string }[]
@@ -337,8 +305,17 @@ export type PrimitiveDef = {
   parameters: { schema: JsonSchema } // shared by every module of this primitive
 }
 
+// Shared vocabulary of the library: data, so new protocols, formats or device kinds need no code.
+export type Vocabulary = {
+  transports: { id: ExternalTransport; label: string; aliases?: string[] }[]
+  formats: Record<Essence, string[]> // MXL media types per essence; the first is the default
+  externals: { kind: ExternalKind; name: string; description: string; direction: 'in' | 'out'; essence: Essence }[]
+  references: { id: ExternalRefKind; label: string; source: string; destination: string }[]
+}
+
 export type PrimitiveLibrary = {
   apiVersion: typeof API_VERSION
   kind: 'PrimitiveLibrary'
-  spec: { categories: CategoryDef[]; primitives: PrimitiveDef[] }
+  metadata: { version: string; description?: string } // bump on every change
+  spec: { vocabulary: Vocabulary; categories: CategoryDef[]; primitives: PrimitiveDef[] }
 }

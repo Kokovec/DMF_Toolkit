@@ -1,7 +1,149 @@
 {
   "apiVersion": "dmf-toolkit/v1alpha2",
   "kind": "PrimitiveLibrary",
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Primitive library: categories, primitives and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
+  },
   "spec": {
+    "vocabulary": {
+      "transports": [
+        {
+          "id": "srt",
+          "label": "SRT"
+        },
+        {
+          "id": "zixi",
+          "label": "ZIXI"
+        },
+        {
+          "id": "rist",
+          "label": "RIST"
+        },
+        {
+          "id": "st2022-7",
+          "label": "2022-7"
+        },
+        {
+          "id": "rtp",
+          "label": "RTP",
+          "aliases": [
+            "rtp-ts"
+          ]
+        },
+        {
+          "id": "udp",
+          "label": "Raw UDP",
+          "aliases": [
+            "udp-ts"
+          ]
+        },
+        {
+          "id": "rtmp",
+          "label": "RTMP"
+        },
+        {
+          "id": "st2110",
+          "label": "ST 2110",
+          "aliases": [
+            "st2110-22",
+            "ipmx"
+          ]
+        },
+        {
+          "id": "ndi",
+          "label": "NDI"
+        },
+        {
+          "id": "file",
+          "label": "File"
+        },
+        {
+          "id": "tams",
+          "label": "TAMS"
+        }
+      ],
+      "formats": {
+        "video": [
+          "video/v210",
+          "video/v210a"
+        ],
+        "audio": [
+          "audio/float32"
+        ],
+        "data": [
+          "video/smpte291"
+        ]
+      },
+      "externals": [
+        {
+          "kind": "camera",
+          "name": "Camera",
+          "description": "Camera or other device producing a video feed (with its audio).",
+          "direction": "out",
+          "essence": "video"
+        },
+        {
+          "kind": "microphone",
+          "name": "Microphone",
+          "description": "External audio-only source.",
+          "direction": "out",
+          "essence": "audio"
+        },
+        {
+          "kind": "source",
+          "name": "External Source",
+          "description": "Remote or third-party feed arriving at the facility.",
+          "direction": "out",
+          "essence": "video"
+        },
+        {
+          "kind": "destination",
+          "name": "External Destination",
+          "description": "Device or system receiving a feed from the facility (programme out, monitor wall, distribution).",
+          "direction": "in",
+          "essence": "video"
+        }
+      ],
+      "references": [
+        {
+          "id": "nmos",
+          "label": "NMOS",
+          "source": "IS-04 sender id",
+          "destination": "IS-04 receiver id"
+        },
+        {
+          "id": "sdp",
+          "label": "SDP / address (RTP, Raw UDP, 2022-7)",
+          "source": "SDP name or URL",
+          "destination": "SDP name or URL"
+        },
+        {
+          "id": "srt",
+          "label": "SRT / RIST party",
+          "source": "remote party name, e.g. venue-truck-1 (address/port: receiver SRT session)",
+          "destination": "remote party name, e.g. cdn-ingest-a"
+        },
+        {
+          "id": "zixi",
+          "label": "ZIXI stream",
+          "source": "Zixi stream id / broadcaster, e.g. venue-feed-1",
+          "destination": "Zixi stream id / target"
+        },
+        {
+          "id": "rtmp",
+          "label": "RTMP stream",
+          "source": "app/stream name pushed to us, e.g. live/venue1",
+          "destination": "RTMP URL or app/stream, e.g. live/cdn-a"
+        },
+        {
+          "id": "ndi",
+          "label": "NDI",
+          "source": "NDI source name",
+          "destination": "NDI receiver name"
+        }
+      ]
+    },
     "categories": [
       {
         "id": "acquisition",
@@ -455,7 +597,8 @@
                       "1920x1080",
                       "3840x2160"
                     ],
-                    "default": "1920x1080"
+                    "default": "1920x1080",
+                    "x-flow": "frameSize"
                   },
                   "rate": {
                     "type": "string",
@@ -467,7 +610,8 @@
                       "59.94",
                       "60"
                     ],
-                    "default": "50"
+                    "default": "50",
+                    "x-flow": "grainRate"
                   },
                   "scan": {
                     "type": "string",
@@ -476,7 +620,8 @@
                       "progressive",
                       "interlaced"
                     ],
-                    "default": "progressive"
+                    "default": "progressive",
+                    "x-flow": "interlace"
                   },
                   "colorspace": {
                     "type": "string",
@@ -486,7 +631,8 @@
                       "BT2020",
                       "BT2100"
                     ],
-                    "default": "BT709"
+                    "default": "BT709",
+                    "x-flow": "colorspace"
                   },
                   "transfer": {
                     "type": "string",
@@ -496,7 +642,8 @@
                       "HLG",
                       "PQ"
                     ],
-                    "default": "SDR"
+                    "default": "SDR",
+                    "x-flow": "transfer"
                   }
                 },
                 "description": "Format the receiver normalizes to; becomes the MXL video flow definition.",
@@ -511,7 +658,8 @@
                     "title": "Channels",
                     "minimum": 1,
                     "maximum": 64,
-                    "default": 2
+                    "default": 2,
+                    "x-flow": "channelCount"
                   }
                 },
                 "description": "Channel count published on the audio flow.",
@@ -934,7 +1082,8 @@
                       "59.94",
                       "60"
                     ],
-                    "default": "source"
+                    "default": "source",
+                    "x-flow": "grainRate"
                   },
                   "conversion": {
                     "type": "string",

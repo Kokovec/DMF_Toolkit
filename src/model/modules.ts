@@ -1,8 +1,9 @@
 // Building vendor modules from primitives.
-import { KNOWN_FORMATS, type Catalog } from './catalog'
+import { type Catalog } from './catalog'
+import { EXTERNAL_TRANSPORTS, KNOWN_FORMATS, TRANSPORT_LABELS, transportOf } from './vocabulary'
 import { roleBase } from './primitives'
 import { getPath, omitPaths } from './schema'
-import { EXTERNAL_TRANSPORTS, TRANSPORT_LABELS, transportOf, type Essence, type ExternalTransport, type JsonSchema, type JsonValue, type PortDef, type PrimitiveDef, type VendorModule } from './types'
+import { type Essence, type ExternalTransport, type JsonSchema, type JsonValue, type PortDef, type PrimitiveDef, type VendorModule } from './types'
 
 
 // Where a primitive declares its transport: top-level `transport` or `output.transport`.

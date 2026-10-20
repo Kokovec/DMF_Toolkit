@@ -1,4 +1,4 @@
-// Minimal JSON Schema support for primitive parameters: defaults and validation of the
+// Minimal JSON Schema support for module parameters: defaults and validation of the
 // subset in types.ts (object/array/string/number/integer/boolean, enum, min/max, required).
 // Unknown keywords are ignored: the vendor function does the authoritative validation.
 import type { JsonSchema, JsonValue } from './types'

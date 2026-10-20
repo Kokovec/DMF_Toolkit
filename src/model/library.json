@@ -1,0 +1,1079 @@
+{
+  "apiVersion": "dmf-toolkit/v1alpha3",
+  "kind": "FeatureLibrary",
+  "metadata": {
+    "version": "2.1.0",
+    "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
+  },
+  "spec": {
+    "vocabulary": {
+      "transports": [
+        {
+          "id": "srt",
+          "label": "SRT"
+        },
+        {
+          "id": "zixi",
+          "label": "ZIXI"
+        },
+        {
+          "id": "rist",
+          "label": "RIST"
+        },
+        {
+          "id": "st2022-7",
+          "label": "2022-7"
+        },
+        {
+          "id": "rtp",
+          "label": "RTP",
+          "aliases": [
+            "rtp-ts"
+          ]
+        },
+        {
+          "id": "udp",
+          "label": "Raw UDP",
+          "aliases": [
+            "udp-ts"
+          ]
+        },
+        {
+          "id": "rtmp",
+          "label": "RTMP"
+        },
+        {
+          "id": "st2110",
+          "label": "ST 2110",
+          "aliases": [
+            "st2110-22",
+            "ipmx"
+          ]
+        },
+        {
+          "id": "ndi",
+          "label": "NDI"
+        },
+        {
+          "id": "file",
+          "label": "File"
+        },
+        {
+          "id": "tams",
+          "label": "TAMS"
+        }
+      ],
+      "formats": {
+        "video": [
+          "video/v210",
+          "video/v210a"
+        ],
+        "audio": [
+          "audio/float32"
+        ],
+        "data": [
+          "video/smpte291"
+        ]
+      },
+      "externals": [
+        {
+          "kind": "camera",
+          "name": "Camera",
+          "description": "Camera or other device producing a video feed (with its audio).",
+          "direction": "out",
+          "essence": "video"
+        },
+        {
+          "kind": "microphone",
+          "name": "Microphone",
+          "description": "External audio-only source.",
+          "direction": "out",
+          "essence": "audio"
+        },
+        {
+          "kind": "source",
+          "name": "External Source",
+          "description": "Remote or third-party feed arriving at the facility.",
+          "direction": "out",
+          "essence": "video"
+        },
+        {
+          "kind": "destination",
+          "name": "External Destination",
+          "description": "Device or system receiving a feed from the facility (programme out, monitor wall, distribution).",
+          "direction": "in",
+          "essence": "video"
+        }
+      ],
+      "references": [
+        {
+          "id": "nmos",
+          "label": "NMOS",
+          "source": "IS-04 sender id",
+          "destination": "IS-04 receiver id"
+        },
+        {
+          "id": "sdp",
+          "label": "SDP / address (RTP, Raw UDP, 2022-7)",
+          "source": "SDP name or URL",
+          "destination": "SDP name or URL"
+        },
+        {
+          "id": "srt",
+          "label": "SRT / RIST party",
+          "source": "remote party name, e.g. venue-truck-1 (address/port: receiver SRT session)",
+          "destination": "remote party name, e.g. cdn-ingest-a"
+        },
+        {
+          "id": "zixi",
+          "label": "ZIXI stream",
+          "source": "Zixi stream id / broadcaster, e.g. venue-feed-1",
+          "destination": "Zixi stream id / target"
+        },
+        {
+          "id": "rtmp",
+          "label": "RTMP stream",
+          "source": "app/stream name pushed to us, e.g. live/venue1",
+          "destination": "RTMP URL or app/stream, e.g. live/cdn-a"
+        },
+        {
+          "id": "ndi",
+          "label": "NDI",
+          "source": "NDI source name",
+          "destination": "NDI receiver name"
+        }
+      ]
+    },
+    "categories": [
+      {
+        "id": "acquisition",
+        "name": "Acquisition",
+        "description": "Getting media into the facility: receiving live streams, decoding contribution feeds, and aligning sources in time."
+      },
+      {
+        "id": "distribution",
+        "name": "Distribution",
+        "description": "Getting media out of the facility to its audiences and partners: encoding for delivery and onward transport."
+      }
+    ],
+    "chainTypes": [
+      {
+        "id": "stream",
+        "name": "Compressed stream"
+      },
+      {
+        "id": "media",
+        "name": "Decoded media"
+      }
+    ],
+    "featureGroups": [
+      {
+        "id": "inputs",
+        "name": "Inputs"
+      },
+      {
+        "id": "options",
+        "name": "Input options",
+        "description": "Built into input blocks; set per instance in the workload designer."
+      },
+      {
+        "id": "processing",
+        "name": "Processing"
+      },
+      {
+        "id": "codecs",
+        "name": "Codecs"
+      },
+      {
+        "id": "outputs",
+        "name": "Outputs"
+      },
+      {
+        "id": "module",
+        "name": "Module-wide"
+      }
+    ],
+    "features": [
+      {
+        "id": "input.srt",
+        "name": "SRT input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external SRT stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "srt",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ],
+          "dualWhen": {
+            "srt.bonding": [
+              "broadcast",
+              "main-backup"
+            ]
+          }
+        },
+        "key": "srt",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "SRT session",
+            "x-audience": "function",
+            "description": "Defines the SRT connection itself. Supplied here and injected into the media function by the orchestrator. Shared settings first, then each path's own connection.",
+            "required": [
+              "mode",
+              "latencyMs",
+              "passphrase"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "listener",
+                  "caller",
+                  "rendezvous"
+                ],
+                "default": "listener"
+              },
+              "latencyMs": {
+                "type": "integer",
+                "title": "Latency (ms)",
+                "description": "Must be ≥ the sender's latency.",
+                "minimum": 20,
+                "maximum": 8000,
+                "default": 120
+              },
+              "encryption": {
+                "type": "string",
+                "title": "Encryption",
+                "enum": [
+                  "off",
+                  "aes-128",
+                  "aes-256"
+                ],
+                "default": "off"
+              },
+              "passphrase": {
+                "type": "string",
+                "title": "Passphrase",
+                "format": "secret-ref",
+                "description": "Required when encryption is enabled.",
+                "x-when": {
+                  "encryption": [
+                    "aes-128",
+                    "aes-256"
+                  ]
+                }
+              },
+              "streamId": {
+                "type": "string",
+                "title": "Stream ID",
+                "description": "Optional; used for multiplexing or identification."
+              },
+              "mtu": {
+                "type": "integer",
+                "title": "MTU",
+                "description": "Usually left at the default unless the path requires otherwise.",
+                "minimum": 76,
+                "maximum": 1500,
+                "default": 1500
+              },
+              "pathA": {
+                "type": "object",
+                "title": "Connection",
+                "x-group": "paths",
+                "required": [
+                  "port",
+                  "remoteAddress"
+                ],
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "title": "Port",
+                    "description": "Local listen port (Listener) or remote port (Caller / Rendezvous).",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "remoteAddress": {
+                    "type": "string",
+                    "title": "Remote address",
+                    "description": "IP or hostname of the remote party (Caller / Rendezvous).",
+                    "x-when": {
+                      "srt.mode": [
+                        "caller",
+                        "rendezvous"
+                      ]
+                    }
+                  }
+                },
+                "x-title-when": [
+                  {
+                    "when": {
+                      "srt.bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    },
+                    "title": "Path A"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "includes": [
+          "option.bonding",
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.zixi",
+        "name": "ZIXI input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external ZIXI stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "zixi",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.rist",
+        "name": "RIST input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external RIST stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "rist",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.st2022-7",
+        "name": "2022-7 input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external 2022-7 stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "st2022-7",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ],
+          "dual": "always"
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.rtp",
+        "name": "RTP input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external RTP stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "rtp",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.udp",
+        "name": "Raw UDP input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external Raw UDP stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "udp",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.rtmp",
+        "name": "RTMP input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one external RTMP stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "output": "stream",
+        "external": {
+          "direction": "in",
+          "protocol": "rtmp",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "option.bonding",
+        "name": "Bonding",
+        "group": "options",
+        "kind": "option",
+        "merge": "srt",
+        "description": "SRT connection bonding: a second path (B) with its own port and remote address; broadcast or main-backup, chosen per instance. Adds a second input to the node when on.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "bonding": {
+                "type": "string",
+                "title": "Bonding",
+                "description": "Two SRT connections over independent paths (SRT connection bonding). broadcast: both carry the stream, the first good packet wins (seamless, 2022-7 style); main-backup: path B takes over if path A fails. Shared session settings apply to both paths.",
+                "enum": [
+                  "none",
+                  "broadcast",
+                  "main-backup"
+                ],
+                "default": "none"
+              },
+              "pathB": {
+                "type": "object",
+                "title": "Path B",
+                "x-group": "paths",
+                "required": [
+                  "port",
+                  "remoteAddress"
+                ],
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "title": "Port",
+                    "description": "Local listen port (Listener) or remote port (Caller / Rendezvous).",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "remoteAddress": {
+                    "type": "string",
+                    "title": "Remote address",
+                    "description": "IP or hostname of the remote party (Caller / Rendezvous).",
+                    "x-when": {
+                      "srt.mode": [
+                        "caller",
+                        "rendezvous"
+                      ]
+                    }
+                  }
+                },
+                "x-when": {
+                  "bonding": [
+                    "broadcast",
+                    "main-backup"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "option.network",
+        "name": "Network constraints",
+        "group": "options",
+        "kind": "option",
+        "key": "network",
+        "description": "For the orchestrator: exposure and, per path, the network, zone and VLAN the stream arrives on.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Network constraints",
+            "x-audience": "orchestrator",
+            "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+            "properties": {
+              "exposure": {
+                "type": "string",
+                "title": "Exposure",
+                "enum": [
+                  "wan-facing",
+                  "internal"
+                ],
+                "default": "wan-facing"
+              },
+              "pathA": {
+                "type": "object",
+                "title": "Network",
+                "x-group": "paths",
+                "properties": {
+                  "network": {
+                    "type": "string",
+                    "title": "Network",
+                    "description": "Logical network the stream arrives on, e.g. contribution."
+                  },
+                  "zone": {
+                    "type": "string",
+                    "title": "Preferred zone"
+                  },
+                  "vlan": {
+                    "type": "string",
+                    "title": "Preferred VLAN / segment"
+                  }
+                },
+                "x-title-when": [
+                  {
+                    "when": {
+                      "srt.bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    },
+                    "title": "Path A network"
+                  }
+                ]
+              },
+              "pathB": {
+                "type": "object",
+                "title": "Path B network",
+                "x-group": "paths",
+                "properties": {
+                  "network": {
+                    "type": "string",
+                    "title": "Network",
+                    "description": "Logical network the stream arrives on, e.g. contribution."
+                  },
+                  "zone": {
+                    "type": "string",
+                    "title": "Preferred zone"
+                  },
+                  "vlan": {
+                    "type": "string",
+                    "title": "Preferred VLAN / segment"
+                  }
+                },
+                "x-when": {
+                  "srt.bonding": [
+                    "broadcast",
+                    "main-backup"
+                  ]
+                },
+                "description": "Should be independent of path A (e.g. a different network or zone)."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "option.payload",
+        "name": "Expected payload",
+        "group": "options",
+        "kind": "option",
+        "key": "payload",
+        "description": "What the incoming stream carries, per path: bitrate (required), container and codecs.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Expected payload",
+            "description": "What the incoming stream carries, per path. The receiver decodes and normalizes it to the output format below; the orchestrator uses the bitrate to reserve bandwidth.",
+            "properties": {
+              "pathA": {
+                "type": "object",
+                "title": "Stream",
+                "x-group": "paths",
+                "required": [
+                  "bitrateMbps"
+                ],
+                "properties": {
+                  "bitrateMbps": {
+                    "type": "number",
+                    "title": "Bitrate (Mbit/s)",
+                    "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "container": {
+                    "type": "string",
+                    "title": "Container",
+                    "enum": [
+                      "mpeg-ts",
+                      "rtp",
+                      "flv"
+                    ],
+                    "default": "mpeg-ts"
+                  },
+                  "videoCodec": {
+                    "type": "string",
+                    "title": "Video codec",
+                    "enum": [
+                      "h264",
+                      "hevc",
+                      "jpeg-xs",
+                      "jpeg2000",
+                      "av1",
+                      "uncompressed"
+                    ],
+                    "default": "h264"
+                  },
+                  "audioCodec": {
+                    "type": "string",
+                    "title": "Audio codec",
+                    "enum": [
+                      "aac",
+                      "mpeg-l2",
+                      "ac3",
+                      "eac3",
+                      "opus",
+                      "pcm"
+                    ],
+                    "default": "aac"
+                  }
+                },
+                "x-title-when": [
+                  {
+                    "when": {
+                      "srt.bonding": [
+                        "broadcast",
+                        "main-backup"
+                      ]
+                    },
+                    "title": "Path A"
+                  }
+                ]
+              },
+              "pathB": {
+                "type": "object",
+                "title": "Path B",
+                "x-group": "paths",
+                "required": [
+                  "bitrateMbps"
+                ],
+                "properties": {
+                  "bitrateMbps": {
+                    "type": "number",
+                    "title": "Bitrate (Mbit/s)",
+                    "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                    "minimum": 0.1,
+                    "maximum": 10000
+                  },
+                  "container": {
+                    "type": "string",
+                    "title": "Container",
+                    "enum": [
+                      "mpeg-ts",
+                      "rtp",
+                      "flv"
+                    ],
+                    "default": "mpeg-ts"
+                  },
+                  "videoCodec": {
+                    "type": "string",
+                    "title": "Video codec",
+                    "enum": [
+                      "h264",
+                      "hevc",
+                      "jpeg-xs",
+                      "jpeg2000",
+                      "av1",
+                      "uncompressed"
+                    ],
+                    "default": "h264"
+                  },
+                  "audioCodec": {
+                    "type": "string",
+                    "title": "Audio codec",
+                    "enum": [
+                      "aac",
+                      "mpeg-l2",
+                      "ac3",
+                      "eac3",
+                      "opus",
+                      "pcm"
+                    ],
+                    "default": "aac"
+                  }
+                },
+                "x-when": {
+                  "srt.bonding": [
+                    "broadcast",
+                    "main-backup"
+                  ]
+                }
+              }
+            },
+            "x-audience": "both"
+          }
+        }
+      },
+      {
+        "id": "decoder",
+        "name": "Decoder",
+        "group": "processing",
+        "kind": "block",
+        "key": "decoder",
+        "description": "Decodes the incoming stream into media. Attach the codecs this product can decode.",
+        "input": "stream",
+        "output": "media",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Decoder",
+            "properties": {
+              "deinterlace": {
+                "type": "string",
+                "title": "Deinterlace",
+                "enum": [
+                  "off",
+                  "auto"
+                ],
+                "default": "off"
+              },
+              "errorConcealment": {
+                "type": "boolean",
+                "title": "Conceal decode errors",
+                "default": true
+              }
+            }
+          }
+        },
+        "rules": {
+          "needsAddon": [
+            {
+              "group": "codecs",
+              "min": 1,
+              "message": "A decoder needs at least one codec"
+            }
+          ]
+        }
+      },
+      {
+        "id": "output.mxl",
+        "name": "MXL output",
+        "group": "outputs",
+        "kind": "block",
+        "key": "format",
+        "description": "Publishes decoded media as MXL flows (video, audio and ANC for a video feed; audio only for an audio feed), normalized to the output format below.",
+        "input": "media",
+        "mxlOutputs": true,
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Output format",
+            "x-audience": "function",
+            "properties": {
+              "video": {
+                "type": "object",
+                "title": "Output video format",
+                "properties": {
+                  "frameSize": {
+                    "type": "string",
+                    "title": "Expected frame size",
+                    "enum": [
+                      "1280x720",
+                      "1920x1080",
+                      "3840x2160"
+                    ],
+                    "default": "1920x1080",
+                    "x-flow": "frameSize"
+                  },
+                  "rate": {
+                    "type": "string",
+                    "title": "Expected frame rate",
+                    "enum": [
+                      "25",
+                      "29.97",
+                      "50",
+                      "59.94",
+                      "60"
+                    ],
+                    "default": "50",
+                    "x-flow": "grainRate"
+                  },
+                  "scan": {
+                    "type": "string",
+                    "title": "Scan",
+                    "enum": [
+                      "progressive",
+                      "interlaced"
+                    ],
+                    "default": "progressive",
+                    "x-flow": "interlace"
+                  },
+                  "colorspace": {
+                    "type": "string",
+                    "title": "Colorspace",
+                    "enum": [
+                      "BT709",
+                      "BT2020",
+                      "BT2100"
+                    ],
+                    "default": "BT709",
+                    "x-flow": "colorspace"
+                  },
+                  "transfer": {
+                    "type": "string",
+                    "title": "Transfer",
+                    "enum": [
+                      "SDR",
+                      "HLG",
+                      "PQ"
+                    ],
+                    "default": "SDR",
+                    "x-flow": "transfer"
+                  }
+                },
+                "description": "Format the receiver normalizes to; becomes the MXL video flow definition.",
+                "x-audience": "function"
+              },
+              "audio": {
+                "type": "object",
+                "title": "Output audio",
+                "properties": {
+                  "channels": {
+                    "type": "integer",
+                    "title": "Channels",
+                    "minimum": 1,
+                    "maximum": 64,
+                    "default": 2,
+                    "x-flow": "channelCount"
+                  }
+                },
+                "description": "Channel count published on the audio flow.",
+                "x-audience": "function"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "module.latency",
+        "name": "Latency budget",
+        "group": "module",
+        "kind": "module",
+        "key": "timing",
+        "description": "Maximum delay through the module; the orchestrator sizes buffers within it.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Timing",
+            "properties": {
+              "maxLatencyMs": {
+                "type": "number",
+                "title": "Latency budget (ms)",
+                "description": "Maximum delay from stream arrival to published grain; the orchestrator sizes buffers within it.",
+                "minimum": 0,
+                "maximum": 10000,
+                "default": 20
+              }
+            },
+            "x-audience": "function"
+          }
+        },
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "codec.h264",
+        "name": "H.264",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "H.264 (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.hevc",
+        "name": "HEVC",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "HEVC (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.jpeg-xs",
+        "name": "JPEG XS",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "JPEG XS (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.jpeg2000",
+        "name": "JPEG 2000",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "JPEG 2000 (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.av1",
+        "name": "AV1",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "AV1 (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.uncompressed",
+        "name": "Uncompressed",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "video",
+        "description": "Uncompressed (video) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.aac",
+        "name": "AAC",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "AAC (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.mpeg-l2",
+        "name": "MPEG-1 Layer II",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "MPEG-1 Layer II (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.ac3",
+        "name": "AC-3",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "AC-3 (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.eac3",
+        "name": "E-AC-3",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "E-AC-3 (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.opus",
+        "name": "Opus",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "Opus (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "codec.pcm",
+        "name": "PCM",
+        "group": "codecs",
+        "kind": "addon",
+        "essence": "audio",
+        "description": "PCM (audio) codec support.",
+        "rules": {
+          "attachTo": [
+            "decoder"
+          ],
+          "maxPerBlock": 1
+        }
+      }
+    ]
+  }
+}

@@ -19,7 +19,7 @@ import '@xyflow/react/dist/style.css'
 import { api, describeError, refreshCatalog, useCatalog } from './api'
 import { EXTERNALS } from './model/externals'
 import { randomUuid } from './model/uuid'
-import { roleBase } from './model/primitives'
+import { vendorSlug } from './model/modules'
 import type { ExternalKind, Wire, WorkloadDefaults, WorkloadDescription } from './model/types'
 import {
   DEFAULTS,
@@ -55,8 +55,8 @@ const newMeta = (): WorkloadMeta => ({ id: 'new-workload', uid: randomUuid(), na
 type SavedRef = { id: string; revision: number; json: string } | null
 type Draft = { document: WorkloadDescription; saved: SavedRef }
 
-// The local draft is not checked against the catalog: its primitives may only exist in the server
-// library, which loads after startup. Unknown primitives render as placeholders.
+// The local draft is not checked against the catalog: its modules may only exist in the server
+// library, which loads after startup. Unknown modules render as placeholders.
 function loadDraft() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -220,7 +220,7 @@ function Editor() {
         if (what === 'fn') {
           const prim = catalog.get(key)
           if (!prim) return nds
-          const base = roleBase(prim.role)
+          const base = vendorSlug(prim.name).slice(0, 24) || 'fn'
           const id = nextNodeId(base, nds.map((n) => n.id))
           node = { id, type: 'fn', position, selected: true, data: newFunctionData(prim, `${prim.name} ${id.slice(base.length + 1)}`) }
         } else if (what === 'ext' && EXTERNALS[key as ExternalKind]) {

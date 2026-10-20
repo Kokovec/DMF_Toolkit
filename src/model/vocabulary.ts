@@ -1,9 +1,9 @@
-// The library's shared vocabulary, loaded from primitives.json: transports (protocols), MXL
+// The library's shared vocabulary, loaded from library.json: transports (protocols), MXL
 // formats, External device kinds and reference kinds. Data, not code: extend it there.
-import { PRIMITIVE_LIBRARY } from './primitives'
+import { LIBRARY } from './library'
 import type { Essence, ExternalKind, ExternalRefKind, ExternalTransport, PortDef } from './types'
 
-const vocab = PRIMITIVE_LIBRARY.spec.vocabulary
+const vocab = LIBRARY.spec.vocabulary
 
 export const EXTERNAL_TRANSPORTS: ExternalTransport[] = vocab.transports.map((t) => t.id)
 export const TRANSPORT_LABELS: Record<ExternalTransport, string> = Object.fromEntries(vocab.transports.map((t) => [t.id, t.label]))

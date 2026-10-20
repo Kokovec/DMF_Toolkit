@@ -36,7 +36,7 @@ export type PartSummary = {
   version: string
   catalogId: string
   name: string
-  role: string
+  categories: string // comma-separated
   vendor: string | null
   usedBy: number
 }

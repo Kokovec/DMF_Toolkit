@@ -2,14 +2,14 @@
 import { createServer } from 'node:http'
 import { createApp } from './app'
 import { Store } from './db'
-import { checkPrimitiveLibrary } from '../src/model/primitives'
+import { checkLibrary } from '../src/model/library'
 
 const PORT = Number(process.env.PORT ?? 3001)
 const HOST = process.env.HOST ?? '127.0.0.1'
 const DB_PATH = process.env.DMF_DB ?? 'data/dmf-toolkit.db'
 
-const problems = checkPrimitiveLibrary()
-if (problems.length) throw new Error(`src/model/primitives.json is invalid: ${problems.join('; ')}`)
+const problems = checkLibrary()
+if (problems.length) throw new Error(`src/model/library.json is invalid: ${problems.join('; ')}`)
 
 const store = new Store(DB_PATH)
 createServer(createApp(store)).listen(PORT, HOST, () => {

@@ -6,14 +6,17 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { Catalog } from '../src/model/catalog'
 import { catalogProblems } from '../src/model/modules'
-import { PRIMITIVE_LIBRARY } from '../src/model/primitives'
-import { API_VERSION, type ModuleCatalog, type PrimitiveLibrary, type VendorModule, type WorkloadDescription } from '../src/model/types'
+import { LIBRARY } from '../src/model/library'
+import { withDerived } from '../src/model/modules'
+import { getPath } from '../src/model/schema'
+import { API_VERSION, type ModuleCatalog, type FeatureLibrary, type ControlSpec, type Dependency, type JsonValue, type ModuleDesign, type ResourceProfile, type VendorModule, type WorkloadDescription } from '../src/model/types'
 
 // Bump when the schema or the stored document shapes change incompatibly.
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 8
 
 const SCHEMA = `
--- Every primitive library version this install has run with (the file lives in git).
+-- Every feature library version this install has run with (the file lives in git).
+-- (Table name kept from when it was the primitive library.)
 CREATE TABLE IF NOT EXISTS primitive_library (
   version     TEXT PRIMARY KEY,
   hash        TEXT NOT NULL,
@@ -36,7 +39,7 @@ CREATE TABLE IF NOT EXISTS modules (
   id          TEXT NOT NULL,
   version     TEXT NOT NULL,
   catalog_id  TEXT NOT NULL REFERENCES catalogs(id),
-  role        TEXT NOT NULL,
+  categories  TEXT NOT NULL, -- comma-separated palette headings
   vendor      TEXT,
   name        TEXT NOT NULL,
   document    TEXT NOT NULL,
@@ -94,26 +97,111 @@ export class Store {
     this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
     const { user_version: version } = this.db.prepare('PRAGMA user_version').get() as { user_version: number }
     const { n: tables } = this.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }
-    if (tables > 0 && version === 2) this.migrateFrom2()
-    if (tables > 0 && (version === 2 || version === 3)) this.migrateFrom3()
-    // v4 -> v5 only adds the primitive_library table (created by SCHEMA below).
-    else if (tables > 0 && version !== 4 && version !== SCHEMA_VERSION)
-      throw new Error(`${path} has schema version ${version}, expected ${SCHEMA_VERSION}. It holds dev data only: delete it to reset.`)
+    if (tables > 0) {
+      if (version < 2 || version > SCHEMA_VERSION)
+        throw new Error(`${path} has schema version ${version}, expected ${SCHEMA_VERSION}. It holds dev data only: delete it to reset.`)
+      if (version === 2) this.migrateFrom2()
+      if (version <= 3) this.migrateFrom3()
+      // v4 -> v5 only added the library table (created by SCHEMA).
+      if (version <= 5) this.migrateFrom5()
+      if (version <= 6) this.migrateFrom6()
+      if (version <= 7) this.migrateFrom7()
+    }
     this.db.exec(SCHEMA)
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
-    this.recordLibrary(PRIMITIVE_LIBRARY)
+    this.recordLibrary(LIBRARY)
   }
 
-  // ---- Primitive library: a versioned file in git, recorded here on startup ----
+  // v5 -> v6: modules are designed from features (no primitives). The `role` column becomes
+  // `categories`; modules built from the old Receiver primitive are converted to a design.
+  private migrateFrom5() {
+    this.tx(() => {
+      const cols = this.db.prepare("SELECT name FROM pragma_table_info('modules')").all() as { name: string }[]
+      if (cols.some((c) => c.name === 'role')) this.db.exec('ALTER TABLE modules RENAME COLUMN role TO categories')
+      const rows = this.db.prepare('SELECT id, version, catalog_id AS catalogId, document FROM modules').all() as {
+        id: string
+        version: string
+        catalogId: string
+        document: string
+      }[]
+      for (const r of rows) {
+        const old = JSON.parse(r.document) as VendorModule & { role?: string }
+        if (old.design) continue
+        if (this.isReferenced(r.id, r.version))
+          throw new Error(`module ${r.id}@${r.version} is used by a saved workload and can't be converted automatically`)
+        const converted = convertReceiver(old, `${r.catalogId}.${this.maxModuleNumber(r.catalogId) + 1}`)
+        this.db
+          .prepare('UPDATE modules SET id = ?, categories = ?, document = ? WHERE id = ? AND version = ?')
+          .run(converted.id, converted.categories.join(','), JSON.stringify(converted), r.id, r.version)
+      }
+    })
+  }
+
+  // v6 -> v7: SRT bonding, network constraints and expected payload became options built into
+  // input blocks (library 2.1.0). Drop them from saved designs and recompute ports and parameters
+  // (same parameter paths, so instances in workloads are unaffected).
+  private migrateFrom6() {
+    const moved = new Set(['addon.bonding', 'addon.network', 'addon.payload'])
+    this.tx(() => {
+      const rows = this.db.prepare('SELECT id, version, document FROM modules').all() as { id: string; version: string; document: string }[]
+      for (const r of rows) {
+        const m = JSON.parse(r.document) as VendorModule
+        if (!m.design) continue
+        const design = { ...m.design, blocks: m.design.blocks.map((b) => ({ ...b, addons: b.addons.filter((a) => !moved.has(a)) })) }
+        this.db.prepare('UPDATE modules SET document = ? WHERE id = ? AND version = ?').run(JSON.stringify(withDerived({ ...m, design })), r.id, r.version)
+      }
+    })
+  }
+
+  // v7 -> v8: vendor settings, control & health, dependencies and resources moved from the module
+  // to each function instance. Every instance in every workload revision gets its module's values
+  // (vendor settings merged with the mapped core values, bindings folded into the dependencies);
+  // modules keep identity, categories and design only.
+  private migrateFrom7() {
+    this.tx(() => {
+      const legacy = new Map<string, LegacyModule>()
+      const mods = this.db.prepare('SELECT id, version, document FROM modules').all() as { id: string; version: string; document: string }[]
+      for (const r of mods) legacy.set(`${r.id}@${r.version}`, JSON.parse(r.document))
+      const revs = this.db.prepare('SELECT workload_id AS id, revision, document FROM workload_revisions').all() as { id: string; revision: number; document: string }[]
+      for (const r of revs) {
+        const doc = JSON.parse(r.document) as WorkloadDescription
+        doc.spec.functions = doc.spec.functions.map((f) => {
+          const { bindings, ...fn } = f as typeof f & { bindings?: Record<string, string> }
+          const m = legacy.get(`${f.type}@${f.typeVersion}`)
+          if (!m) return fn
+          const settings = legacyVendorConfig(m, f.parameters, f.settings ?? {})
+          return {
+            ...fn,
+            ...(Object.keys(settings).length ? { settings } : {}),
+            ...(m.control ? { control: m.control } : {}),
+            ...(m.dependencies?.length ? { dependencies: m.dependencies.map((d) => (bindings?.[d.name] ? { ...d, binding: bindings[d.name] } : d)) } : {}),
+            ...(m.resources ? { resources: m.resources } : {}),
+          }
+        })
+        this.db.prepare('UPDATE workload_revisions SET document = ? WHERE workload_id = ? AND revision = ?').run(JSON.stringify(doc), r.id, r.revision)
+      }
+      for (const r of mods) {
+        const { vendorSettings: _v, control: _c, dependencies: _d, resources: _r, ...m } = legacy.get(`${r.id}@${r.version}`)!
+        this.db.prepare('UPDATE modules SET document = ? WHERE id = ? AND version = ?').run(JSON.stringify(m), r.id, r.version)
+      }
+    })
+  }
+
+  private maxModuleNumber(catalogId: string): number {
+    const rows = this.db.prepare('SELECT id FROM modules WHERE catalog_id = ?').all(catalogId) as { id: string }[]
+    return Math.max(0, ...rows.map((r) => Number(r.id.slice(catalogId.length + 1))).filter((x) => Number.isInteger(x)))
+  }
+
+  // ---- Feature library: a versioned file in git, recorded here on startup ----
 
   // Records the library version shipped with this build. A changed file must carry a new version.
-  private recordLibrary(lib: PrimitiveLibrary) {
+  private recordLibrary(lib: FeatureLibrary) {
     const document = JSON.stringify(lib)
     const hash = createHash('sha256').update(document).digest('hex')
     const row = this.db.prepare('SELECT hash FROM primitive_library WHERE version = ?').get(lib.metadata.version) as { hash: string } | undefined
     if (row && row.hash !== hash)
       throw new Error(
-        `src/model/primitives.json changed but its metadata.version (${lib.metadata.version}) did not. Bump the version.`,
+        `src/model/library.json changed but its metadata.version (${lib.metadata.version}) did not. Bump the version.`,
       )
     if (!row)
       this.db
@@ -125,7 +213,7 @@ export class Store {
     return this.db.prepare('SELECT version, hash, loaded_at AS loadedAt FROM primitive_library ORDER BY loaded_at DESC').all()
   }
 
-  getLibrary(version: string): PrimitiveLibrary {
+  getLibrary(version: string): FeatureLibrary {
     const row = this.db.prepare('SELECT document FROM primitive_library WHERE version = ?').get(version) as { document: string } | undefined
     if (!row) throw new HttpError(404, `library version ${version} not found`)
     return JSON.parse(row.document)
@@ -163,7 +251,7 @@ export class Store {
   // ---- Parts ----
 
   listModules(): VendorModule[] {
-    const rows = this.db.prepare('SELECT document FROM modules ORDER BY role, name, id, version').all() as {
+    const rows = this.db.prepare('SELECT document FROM modules ORDER BY name, id, version').all() as {
       document: string
     }[]
     return rows.map((r) => JSON.parse(r.document))
@@ -267,12 +355,12 @@ export class Store {
       return { conflict: `${key} is used by saved workloads; publish it as a new version instead` }
     this.db
       .prepare(
-        `INSERT INTO modules (id, version, catalog_id, role, vendor, name, document, created_at)
+        `INSERT INTO modules (id, version, catalog_id, categories, vendor, name, document, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id, version) DO UPDATE SET role = excluded.role, vendor = excluded.vendor, name = excluded.name,
+         ON CONFLICT (id, version) DO UPDATE SET categories = excluded.categories, vendor = excluded.vendor, name = excluded.name,
            document = excluded.document`,
       )
-      .run(t.id, t.version, catalogId, t.role, t.vendor ?? null, t.name, document, new Date().toISOString())
+      .run(t.id, t.version, catalogId, (t.categories ?? []).join(','), t.vendor ?? null, t.name, document, new Date().toISOString())
     return { result: existing ? 'updated' : 'added' }
   }
 
@@ -280,10 +368,10 @@ export class Store {
   listParts() {
     return this.db
       .prepare(
-        `SELECT t.id, t.version, t.catalog_id AS catalogId, t.name, t.role, t.vendor,
+        `SELECT t.id, t.version, t.catalog_id AS catalogId, t.name, t.categories, t.vendor,
                 (SELECT COUNT(DISTINCT r.workload_id) FROM workload_type_refs r
                  WHERE r.type_id = t.id AND r.type_version = t.version) AS usedBy
-         FROM modules t ORDER BY t.catalog_id, t.role, t.name, t.id, t.version`,
+         FROM modules t ORDER BY t.catalog_id, t.name, t.id, t.version`,
       )
       .all()
   }
@@ -356,4 +444,66 @@ export class Store {
     const { changes } = this.db.prepare('DELETE FROM workloads WHERE id = ?').run(id)
     if (!changes) throw new HttpError(404, `workload ${id} not found`)
   }
+}
+
+// Old Receiver modules (v5) -> a design: <protocol> input -> decoder -> MXL output,
+// plus the latency budget. Core parameter paths in the vendor-settings mapping move with them.
+function convertReceiver(old: LegacyModule, id: string): LegacyModule {
+  const ext = old.ports.find((p) => p.transport !== 'mxl')
+  const protocol = ext && ext.transport !== 'mxl' ? ext.transport.external : 'srt'
+  const input = `${protocol.replace(/[^a-z0-9]/g, '')}1`
+  const design: ModuleDesign = {
+    blocks: [
+      { id: input, feature: `input.${protocol}`, addons: [], essence: ext?.essence },
+      { id: 'decoder1', feature: 'decoder', addons: ['codec.h264', 'codec.hevc', 'codec.aac'] },
+      { id: 'mxl1', feature: 'output.mxl', addons: [] },
+    ],
+    links: [
+      { from: input, to: 'decoder1' },
+      { from: 'decoder1', to: 'mxl1' },
+    ],
+    moduleFeatures: ['module.latency'],
+  }
+  const move = (path: string) =>
+    path.startsWith('video.') || path.startsWith('audio.')
+      ? `mxl1.format.${path}`
+      : ['srt.', 'network.', 'payload.'].some((p) => path.startsWith(p))
+        ? `${input}.${path}`
+        : path
+  const { role: _role, ...rest } = old
+  return withDerived({
+    ...rest,
+    id,
+    categories: ['acquisition'],
+    design,
+    ...(old.vendorSettings ? { vendorSettings: { ...old.vendorSettings, mapping: old.vendorSettings.mapping.map((m) => ({ ...m, core: move(m.core) })) } } : {}),
+  } as VendorModule)
+}
+
+// Module documents before v8 carried the vendor's settings schema + mapping, control, dependencies
+// and resources (now per instance).
+type LegacyModule = VendorModule & {
+  role?: string
+  vendorSettings?: { schema: unknown; mapping: { core: string; vendor: string; values?: Record<string, JsonValue> }[] }
+  control?: ControlSpec
+  dependencies?: Dependency[]
+  resources?: ResourceProfile
+}
+
+// The instance's vendor configuration as the old mapping produced it: its settings plus the mapped
+// core values (translated by the value maps).
+function legacyVendorConfig(m: LegacyModule, parameters: JsonValue, settings: { [k: string]: JsonValue }): { [k: string]: JsonValue } {
+  const out = structuredClone(settings)
+  for (const { core, vendor, values } of m.vendorSettings?.mapping ?? []) {
+    const v = getPath(parameters, core)
+    if (v === undefined) continue
+    const keys = vendor.split('.')
+    let cur = out
+    for (const k of keys.slice(0, -1)) {
+      if (!cur[k] || typeof cur[k] !== 'object' || Array.isArray(cur[k])) cur[k] = {}
+      cur = cur[k] as { [k: string]: JsonValue }
+    }
+    cur[keys[keys.length - 1]] = values && String(v) in values ? values[String(v)] : v
+  }
+  return out
 }

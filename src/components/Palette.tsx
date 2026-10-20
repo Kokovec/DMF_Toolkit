@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { api, describeError, refreshCatalog, useCatalog, type CatalogSummary } from '../api'
 import { checkCatalog, isEdge } from '../model/catalog'
 import { EXTERNALS, EXTERNAL_KINDS } from '../model/externals'
-import { primitiveTree } from '../model/primitives'
+import { LIBRARY } from '../model/library'
 import type { ModuleCatalog } from '../model/types'
 
-export const DRAG_MIME = 'application/x-dmf-node' // "fn:<primitive id>" or "ext:<external kind>"
+export const DRAG_MIME = 'application/x-dmf-node' // "fn:<module type id>" or "ext:<external kind>"
 
 type Props = { online: boolean; onMessage: (msg: string, isError: boolean) => void }
 
@@ -44,14 +44,11 @@ export function Palette({ online, onMessage }: Props) {
 
   return (
     <aside className="palette">
-      {primitiveTree().map(({ category, primitives }) => (
+      {LIBRARY.spec.categories.map((category) => (
         <section key={category.id} className="palette-category">
           <h2 title={category.description}>{category.name}</h2>
-          {primitives.map((prim) => (
-            <section key={prim.id}>
-              <h3 title={prim.description}>{prim.plural}</h3>
-              {catalog.forRole(prim.id).length === 0 && <p className="hint">No vendor modules yet.</p>}
-              {catalog.forRole(prim.id).map((p) => (
+          {catalog.forCategory(category.id).length === 0 && <p className="hint">No vendor modules yet.</p>}
+          {catalog.forCategory(category.id).map((p) => (
             <div
               key={p.id}
               className={`palette-item fn${isEdge(p) ? ' edge' : ''}`}
@@ -62,8 +59,6 @@ export function Palette({ online, onMessage }: Props) {
               {p.name}
               <span className="hint"> {p.vendor}</span>
             </div>
-              ))}
-            </section>
           ))}
         </section>
       ))}

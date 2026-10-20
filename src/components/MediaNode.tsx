@@ -3,7 +3,7 @@ import { Handle, Position, useEdges, useUpdateNodeInternals, type NodeProps } fr
 import { useCatalog } from '../api'
 import { isEdge, isRequired, resolvePorts, transportLabel, type ResolvedPort } from '../model/catalog'
 import { EXTERNALS } from '../model/externals'
-import { roleLabel } from '../model/primitives'
+import { getCategory } from '../model/library'
 import { defaultsFor } from '../model/schema'
 import type { JsonValue, VendorModule } from '../model/types'
 import { BUNDLE, portsOf, moduleOf, type ExtNode, type FnNode } from '../model/workload'
@@ -14,7 +14,7 @@ export function FunctionNode({ id, data, selected }: NodeProps<FnNode>) {
   if (!prim)
     return (
       <div className="block block-unknown">
-        {data.name}: primitive {data.type}@{data.typeVersion} is not in the library
+        {data.name}: module {data.type}@{data.typeVersion} is not in the library
       </div>
     )
   return (
@@ -36,14 +36,14 @@ export function ExternalNode({ id, data, selected }: NodeProps<ExtNode>) {
   )
 }
 
-// A primitive as it would appear on the canvas with default parameters (parts editor preview).
+// A module as it would appear on the canvas with default parameters (parts editor preview).
 export function ModulePreview({ id, prim, params }: { id: string; prim: VendorModule; params?: { [k: string]: JsonValue } }) {
   return (
     <NodeView
       id={id}
       className={nodeClass(prim)}
       title={prim.name || 'Unnamed'}
-      subtitle={`${prim.role ? roleLabel(prim.role) : 'primitive?'} · ${prim.vendor || 'vendor?'}`}
+      subtitle={`${prim.categories.map((c) => getCategory(c)?.name ?? c).join(', ') || 'no category'} · ${prim.vendor || 'vendor?'}`}
       ports={resolvePorts(prim.ports, params ?? defaultsFor(prim.parameters.schema))}
     />
   )

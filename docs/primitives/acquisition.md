@@ -1,9 +1,14 @@
 # Acquisition — Primitives (draft for review)
 
+> **Partly historical (2026-10-20):** primitives were removed. Modules are now designed from
+> features in `src/model/library.json` (see `../design-rules.md` R3.1, R7). The SRT parameter
+> detail below still applies, now split across the SRT input block and its Bonding, Network
+> constraints and Expected payload add-ons; port ids are prefixed with the block id.
+
 > Design rules and their history: [`../design-rules.md`](../design-rules.md). This document holds the
 > detailed definitions for this category's primitives.
 
-Status: draft 2026-10-11 (rev 9: parameters follow the protocol: SRT session + network constraints; other protocols blank for now). Source of truth: `src/model/primitives.json`.
+Status: draft 2026-10-11 (rev 9: parameters follow the protocol: SRT session + network constraints; other protocols blank for now). Source of truth: `src/model/library.json`.
 
 ## Where primitives sit
 

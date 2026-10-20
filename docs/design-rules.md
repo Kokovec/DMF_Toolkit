@@ -2,8 +2,9 @@
 
 **The single source for current design decisions.** When a rule changes, update it here and add
 a line to the [decision log](#decision-log). Other docs hold detail: the orchestrator contract
-(`orchestrator-contract.md`) and per-category primitive definitions (`primitives/*.md`).
-`media-primitive.md` and `orchestration-model.md` are historical.
+(`orchestrator-contract.md`) and per-feature parameter detail (`primitives/*.md`, written when
+primitives still existed; the parameters now live on features). `media-primitive.md` and
+`orchestration-model.md` are historical.
 
 "Enforced by" names the code that checks the rule. If a rule isn't enforced in code, it says so.
 
@@ -36,64 +37,90 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 
 ## 3. Hierarchy and identity
 
-- **R3.1 Category → Primitive → Vendor module.** No generic layer.
-  - *Category*: heading, e.g. Acquisition, Distribution.
-  - *Primitive*: the base type of a function, with port templates and core parameters
-    (`src/model/primitives.json`).
-  - *Vendor module*: a deployable function from one vendor, built from a primitive.
-- **R3.2 A module names its primitive in `role` and must conform to it:** exactly the
-  primitive's ports for the chosen input type and protocol, and every core parameter kept with
-  the same type (options may only narrow, nothing added).
-  *Enforced by:* `conformance` (`src/model/catalog.ts`).
+- **R3.1 Modules are designed from features; there are no primitives.** A vendor module starts
+  blank and the author drags **features** from the library onto it (Modules tab → Design):
+  - *block*: a stage of a signal chain: inputs (SRT, ZIXI, RIST, 2022-7, RTP, Raw UDP, RTMP),
+    Decoder, MXL output;
+  - *add-on*: dropped onto a block (codecs on a decoder);
+  - *option*: built into a block, not placed by the author; its settings are chosen per instance
+    in the workload designer (on every input: network constraints and expected payload; on SRT
+    inputs also bonding). See R3.10;
+  - *module-wide*: applies to the whole module (latency budget).
+
+  Blocks are linked into **signal chains** (e.g. SRT input → Decoder → MXL output). A
+  multi-function product has several chains in one module.
+- **R3.2 A module is in one or more categories** (Acquisition, Distribution, …), which decide where
+  it appears in the palette. *Enforced by:* `checkModule` (`src/model/catalog.ts`).
+- **R3.8 Design rules live with the features in the library:** a link joins matching chain
+  types (compressed stream → decoder → decoded media → MXL output), one input per block, no
+  loops; `attachTo` (where an add-on may go), `maxPerBlock`, `maxPerModule`, `needsAddon` (e.g.
+  a decoder needs at least one codec). Invalid drops and links are refused with the reason; unmet
+  rules are listed live and block saving.
+  *Enforced by:* `canAddFeature`, `canAttach`, `canLink`, `designProblems` (`src/model/compose.ts`).
+- **R3.9 Ports and core parameters are derived from the design, never edited.** Each block's
+  parameters sit under its block id (`srt1.srt.latencyMs`); its ports are prefixed with it
+  (`srt1.in.video`, `mxl1.video`), and each MXL output block is its own time context. The server
+  refuses a module whose stored ports or parameters differ from its design.
+  *Enforced by:* `composeModule` (`compose.ts`), `withDerived` (`modules.ts`), `checkModule`.
+- **R3.10 The module designer defines structure, not configuration.** It chooses features,
+  add-ons, links and each input's feed type; it never sets parameter values (SRT session, bonding,
+  network constraints, payload, formats…). Those are set per instance in the workload designer
+  (Inspector). The designer only names the settings each block adds, and its node preview uses
+  default parameters. *Enforced by:* `ModuleDesigner.tsx` (no parameter forms).
 - **R3.3 One catalog per vendor.** The vendor name is mandatory and unique; catalog id =
   slug of the vendor name (e.g. "Acme Media" → `acme-media`). A module's vendor is its catalog's.
   *Enforced by:* `catalogProblems` (`src/model/modules.ts`), unique `catalogs.vendor` (`server/db.ts`).
-- **R3.4 Type id = `<catalog>.<primitive>.<number>`**, numbered automatically with the next free
-  number for that vendor and primitive (e.g. `acme-media.receiver.2`). *Duplicate* gets a new
+- **R3.4 Type id = `<catalog>.<number>`**, numbered automatically with the next free number in
+  the vendor's catalog (e.g. `acme-media.2`). *Duplicate* gets a new
   number; *New version* keeps it. *Enforced by:* `nextModuleId`, `catalogProblems`.
 - **R3.6 Three layers: engine in code, vocabulary in the library, instances in the database.**
-  - *Engine* (code): what the rule keywords mean, wiring rules, conformance, identity, publish
+  - *Engine* (code): what the rule keywords mean, composition, wiring rules, identity, publish
     checks, flow derivation.
-  - *Primitive library* (`src/model/primitives.json`): categories, primitives and the shared
+  - *Feature library* (`src/model/library.json`): categories, chain types, feature groups,
+    features (parameters, ports, design rules) and the shared
     **vocabulary** (protocols with labels/aliases, MXL formats, External device kinds, reference
-    kinds). New protocols, formats or device kinds need a library change only, no code.
-    *Loaded by:* `src/model/vocabulary.ts`.
+    kinds). New features, protocols, formats or device kinds need a library change only, no code.
+    *Loaded by:* `src/model/library.ts`, `src/model/vocabulary.ts`.
   - *Database*: vendor catalogs and modules, workloads.
-- **R3.7 The primitive library is a versioned file in git, not editable in the UI.** It's the
+- **R3.7 The feature library is a versioned file in git, not editable in the UI.** It's the
   shared language with the orchestrator, so it changes deliberately and under review.
   `metadata.version` must be bumped on every change. The server records each version in the
   database at startup, refuses a changed file with an unchanged version, and serves it at
   `GET /api/library` (and `/api/library/:version`). Published workloads carry `libraryVersion`.
-  *Enforced by:* `checkPrimitiveLibrary`, `Store.recordLibrary` (`server/db.ts`).
+  *Enforced by:* `checkLibrary`, `Store.recordLibrary` (`server/db.ts`).
 - **R3.5 Module versions are immutable once a saved workload uses them.** Changes go into a new
   version; instances can upgrade. *Enforced by:* `server/db.ts` (`isReferenced`).
 
 ## 4. What a module contains
 
-- **R4.1 A module is:** identity & capability, media ports, core parameters, vendor settings
-  (+ core → vendor mapping), control & health endpoints, dependencies, and an optional vendor
-  resource profile.
+- **R4.1 A module is only identity & categories and its design** (from which ports and core
+  parameters follow). *Enforced by:* `VendorModule` (`types.ts`), `checkModule`.
 - **R4.2 No placement or infrastructure on the module:** no image, licences, locality, edge
   interfaces or node constraints. Edge functions are inferred from external ports (`isEdge`).
-- **R4.3 Resource profile = the vendor's declared needs** (CPU, memory, GPU, network, storage).
-  It is a requirement for the orchestrator's sizing, not an allocation.
-- **R4.4 Core parameters** are the primitive's common vocabulary: minimal, understood by the
+- **R4.3 Each function instance carries its own setup**, set in the workload designer
+  (Inspector): vendor settings, control & health endpoints, dependencies (each bound to a facility
+  resource) and the resource profile. A health check is required, and so is a binding for every
+  required dependency. *Enforced by:* `setupProblems` (`workload.ts`), `FunctionSetup.tsx`.
+- **R4.4 Core parameters** are the features' common vocabulary: minimal, understood by the
   configurator (wiring, flow formats, vendor swaps).
-- **R4.5 Vendor settings mirror the vendor's own configuration names and structure.** A mapping
-  says where each core parameter lands, with optional value translation. Mapped keys are filled
-  from the core value, so designers set each value once. The orchestrator passes the merged result
-  through. *Enforced by:* `vendorSettingsProblems` (`catalog.ts`); `settingsSchema`, `vendorConfig` (`modules.ts`).
+- **R4.5 Vendor settings are free-form JSON in the vendor's own names and structure** (typed in or
+  loaded from a file), passed through unchanged by the orchestrator. No schema and no core → vendor
+  mapping: the orchestrator gets core parameters and vendor settings side by side.
+- **R4.7 Resource profile = what the instance needs** (CPU, memory, GPU, network, storage): a
+  requirement for the orchestrator's sizing, not an allocation.
 - **R4.6 New vendor features = a new module version.** Instances upgrade explicitly; the
-  Inspector shows added and removed settings.
+  Inspector shows added and removed parameters. An instance's own setup is kept on upgrade.
 
 ## 5. Parameters
 
-- **R5.1 Core parameters follow the module's protocol.** Blocks marked `x-protocols` exist only
-  on modules of that protocol. *Enforced by:* `coreSchemaFor` (`modules.ts`).
+- **R5.1 Core parameters follow the design:** each block contributes its feature's group plus
+  its built-in options' and add-ons' groups (one with `merge` joins the block's group, e.g.
+  bonding inside the SRT session). *Enforced by:* `composeModule` (`compose.ts`).
 - **R5.2 Every parameter group says who uses it** (`x-audience`): *injected into the media
   function*, *for the orchestrator*, or *both*.
 - **R5.3 Conditional fields** (`x-when`) are shown, and required if listed as required, only
-  while their condition holds. Dotted keys (`srt.bonding`) refer to another group.
+  while their condition holds. Dotted keys (`srt.bonding`) refer to another group of the same
+  block; composition prefixes them with the block id (`srt1.srt.bonding`).
   *Enforced by:* `applies`, `validateValue` (`src/model/schema.ts`), `SchemaForm`.
 - **R5.4 Dual paths are laid out as separate, parallel boxes** (Path A | Path B) in every group
   they affect (session, network constraints, payload), via `x-group` and `x-title-when`. Without
@@ -105,8 +132,10 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 
 ## 6. Ports, wiring and flows
 
-- **R6.1 Module ports are fixed by the primitive.** The author chooses only the input type
-  (video feed or audio-only feed) and the one protocol. *Enforced by:* `portsFor`, `conformance`.
+- **R6.1 Module ports come from its blocks:** an input block gives one external port on its
+  protocol (the author chooses video feed or audio-only feed); an MXL output block gives video,
+  audio and ANC flows for a video feed upstream, audio only for an audio feed.
+  *Enforced by:* `composeModule`.
 - **R6.2 Flows are mono-essence;** a feed's video, audio and ANC flows share a time context and
   are drawn as one connection (expandable, to split audio from video).
 - **R6.3 A wire is source port → destination port.** An output can feed many inputs (one flow,
@@ -125,26 +154,30 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
   60000/1001).
   *Enforced by:* `flowsOf` (`workload.ts`).
 - **R6.7 A port can have two paths:**
-  - **per module:** a 2022-7 receiver gets legs `.a` / `.b` (`dualFor`);
-  - **per instance:** SRT bonding adds path B (`in.video` "SRT A" + `in.video.b` "SRT B",
-    `dualWhen`). Path A keeps its wire when bonding is toggled.
+  - **per module:** a 2022-7 input block gets legs `.a` / `.b` (feature `external.dual: always`);
+  - **per instance:** an SRT input gets path B when bonding is turned on in the workload
+    (`srt1.in.video` + `srt1.in.video.b`, `dualWhen`). Path A keeps its wire when bonding is toggled.
 
-  Both paths are required. *Enforced by:* `portsFor`, `resolvePorts`, `publishProblems`.
+  Both paths are required. *Enforced by:* `composeModule`, `resolvePorts`, `publishProblems`.
 
-## 7. Receiver (Acquisition)
+## 7. Features defined so far
 
-- **R7.1 A Receiver takes one external stream on one protocol and outputs MXL** (decoded and
-  normalized): video, audio and ANC flows for a video feed, audio only for an audio feed.
-- **R7.2 Protocols:** SRT, ZIXI, RIST, 2022-7, RTP, Raw UDP, RTMP. **One protocol per module**;
-  a vendor supporting several protocols has one module per protocol.
-- **R7.3 Parameters are defined per protocol, one at a time.** SRT is defined:
-  - **SRT session** (*function*): mode, bonding, latency, encryption, passphrase (if
-    encrypted), stream ID, MTU, plus per path port and remote address (if caller/rendezvous).
-  - **Network constraints** (*orchestrator*): exposure, plus per path network, zone, VLAN.
-  - **Expected payload** (*both*): per path bitrate (required), container, codecs.
-  - The other protocols have no session parameters yet.
+- **R7.1 Inputs** take one external stream on one protocol each: SRT, ZIXI, RIST, 2022-7, RTP,
+  Raw UDP, RTMP. A product supporting several protocols gets several input blocks (in one module
+  or several).
+- **R7.2 SRT is fully defined:**
+  - **SRT input** session (*function*): mode, latency, encryption, passphrase (if encrypted),
+    stream ID, MTU, port and remote address (if caller/rendezvous);
+  - **Bonding** option (merged into the session): none / broadcast / main-backup, with path B;
+  - **Network constraints** option (*orchestrator*, every input): exposure, plus per path network,
+    zone, VLAN;
+  - **Expected payload** option (*both*, every input): per path bitrate (required), container, codecs.
 
-  Details: `primitives/acquisition.md`.
+  The other protocols have no session parameters yet. Details: `primitives/acquisition.md`.
+- **R7.3 Decoder** turns a compressed stream into decoded media and needs at least one codec
+  add-on (H.264, HEVC, JPEG XS, JPEG 2000, AV1, uncompressed; AAC, MPEG-1 Layer II, AC-3, E-AC-3,
+  Opus, PCM). **MXL output** publishes decoded media as MXL flows with its format (`x-flow`).
+  **Latency budget** is module-wide.
 
 ## 8. Workloads and publishing
 
@@ -156,7 +189,7 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 ## 9. Storage and deployment of the tool
 
 - **R9.1 One install per customer** (shared by that customer's team): library server + SQLite
-  (`data/`, git-ignored). Schema migrations run automatically (now schema v5).
+  (`data/`, git-ignored). Schema migrations run automatically (now schema v8; v5 modules are converted to designs).
 - **R9.2 Dark theme only.**
 
 ---
@@ -190,13 +223,20 @@ a line to the [decision log](#decision-log). Other docs hold detail: the orchest
 | 2026-10-13 | Design rules consolidated into this document | |
 | 2026-10-13 | Engine in code, vocabulary in the library, instances in the database. Protocols, MXL formats, External device kinds and reference kinds moved into the library's `vocabulary`; flow formats come from `x-flow` tags | R3.6, R6.6 |
 | 2026-10-13 | The primitive library stays a versioned file in git (not editable in the UI), recorded in the database at startup (schema v5), served at `/api/library`; published workloads carry `libraryVersion` | R3.7 |
+| 2026-10-20 | Primitives removed. Modules are designed from drag-and-drop features (blocks, add-ons, module-wide) linked into signal chains inside the module, so multi-function products can be built from scratch | Supersedes Category → Primitive → Module and conformance (old R3.1, R3.2, R5.1, R6.1, R7); R3.1, R3.9 |
+| 2026-10-20 | A module is in one or more categories (replaces `role`) | R3.2 |
+| 2026-10-20 | Features and their design rules live in the versioned library file (`library.json` v2.0.0, `dmf-toolkit/v1alpha3`) | R3.6, R3.7, R3.8 |
+| 2026-10-20 | Type id `<catalog>.<n>`; schema v6 converts existing receivers into SRT → Decoder (H.264, HEVC, AAC) → MXL designs | R3.4, R9.1 |
+| 2026-10-20 | The module designer doesn't expose configuration (e.g. SRT settings); values are set in the workload designer | Removed the block try-out form; R3.10 |
+| 2026-10-20 | Bonding, network constraints and expected payload are options of the input, chosen per instance in the workload designer, not add-ons placed in the module designer (library 2.1.0, schema v7) | R3.1, R7.2 |
+| 2026-10-20 | Vendor settings, control & health, dependencies and resource profile moved from the module (Modules tab sections 3–6) to each function instance in the workload designer. Vendor settings become free-form JSON (no schema, no core → vendor mapping). Schema v8 copies each module's values onto its instances | Supersedes R4.1, R4.3, R4.5 as of 10-11; R4.3, R4.5, R4.7 |
 
 ## Open questions
 
-- Receiver vs Decoder: the Receiver now decodes compressed protocols. Is a separate Decoder
-  still needed, and for what?
-- 2022-7 receivers: which session parameters (SDP / addresses per leg, codec carried)?
+- 2022-7 inputs: which session parameters (SDP / addresses per leg, codec carried)?
 - Session parameters for ZIXI, RIST, RTP, Raw UDP, RTMP.
 - Should network constraints apply to every protocol, or be defined per protocol like the session?
-- Decoder and Encoder still use the older three-port external bundles.
-- Synchronizer scope (frame-rate conversion? ANC?).
+- Features still missing: MXL input, encoder and outputs (Distribution), synchronizer (scope:
+  frame-rate conversion? ANC?), processing beyond decoding.
+- Should a module's design be visible to the orchestrator (e.g. to place chains separately), or
+  only its ports and parameters?

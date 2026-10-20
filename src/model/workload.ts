@@ -2,12 +2,14 @@ import type { Edge, Node } from '@xyflow/react'
 import { currentCatalog, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
 import { EXTERNALS } from './externals'
 import { KNOWN_FORMATS } from './vocabulary'
-import { settingsSchema } from './modules'
-import { PRIMITIVE_LIBRARY } from './primitives'
+import { LIBRARY } from './library'
 import { defaultsFor, getPath, leafPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
 import {
   API_VERSION,
+  DEPENDENCY_KINDS,
+  type ControlSpec,
+  type Dependency,
   type Discovery,
   type Essence,
   type Expectations,
@@ -21,6 +23,7 @@ import {
   type JsonSchema,
   type JsonValue,
   type PlacementConstraints,
+  type ResourceProfile,
   type Rational,
   type VendorModule,
   type Wire,
@@ -37,8 +40,10 @@ export type FnData = {
   name: string
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
-  settings: { [key: string]: JsonValue } // vendor settings (mapped keys excluded)
-  bindings?: Record<string, string>
+  settings: { [key: string]: JsonValue } // the vendor's own configuration (free-form)
+  control?: ControlSpec
+  dependencies?: Dependency[]
+  resources?: ResourceProfile
   expectations?: Expectations
   placement?: PlacementConstraints
   discovery?: Discovery
@@ -100,7 +105,8 @@ export function newFunctionData(prim: VendorModule, name: string): FnData {
     name,
     domain: DEFAULT_DOMAIN,
     parameters: (defaultsFor(prim.parameters.schema) as { [k: string]: JsonValue }) ?? {},
-    settings: (defaultsFor(settingsSchema(prim)) as { [k: string]: JsonValue }) ?? {},
+    settings: {},
+    control: { health: { type: 'http', port: 8080, path: '/healthz' } },
   }
 }
 
@@ -118,20 +124,11 @@ function carryOver(schema: JsonSchema, old: JsonValue | undefined): { [k: string
   return out
 }
 
-// Switch an instance to another module: core parameters carry over (same primitive, so the same
-// vocabulary); vendor settings carry over only where the new module still has the same keys
-// (e.g. an upgrade), otherwise they start from the new module's defaults (another vendor).
+// Switch an instance to another module: core parameters carry over where the new module has the
+// same blocks and keys (same feature vocabulary). The instance's own setup (vendor settings,
+// control & health, dependencies, resources) stays as it is.
 export function rebind(data: FnData, prim: VendorModule): FnData {
-  const slots = new Set(prim.dependencies.map((d) => d.name))
-  const bindings = Object.fromEntries(Object.entries(data.bindings ?? {}).filter(([k]) => slots.has(k)))
-  return {
-    ...data,
-    type: prim.id,
-    typeVersion: prim.version,
-    parameters: carryOver(prim.parameters.schema, data.parameters),
-    settings: carryOver(settingsSchema(prim), data.settings),
-    bindings,
-  }
+  return { ...data, type: prim.id, typeVersion: prim.version, parameters: carryOver(prim.parameters.schema, data.parameters) }
 }
 
 // ---- Wiring ----
@@ -284,7 +281,9 @@ export function toWorkload(
       parameters: d.parameters,
     }
     if (d.settings && Object.keys(d.settings).length) fn.settings = d.settings
-    if (d.bindings && Object.keys(d.bindings).length) fn.bindings = d.bindings
+    if (d.control && Object.keys(d.control).length) fn.control = d.control
+    if (d.dependencies?.length) fn.dependencies = d.dependencies
+    if (d.resources && Object.keys(d.resources).length) fn.resources = d.resources
     if (d.expectations && Object.keys(d.expectations).length) fn.expectations = d.expectations
     if (d.placement && Object.keys(d.placement).length) fn.placement = d.placement
     if (d.discovery) fn.discovery = d.discovery
@@ -320,7 +319,9 @@ export function fromWorkload(doc: WorkloadDescription): {
       domain: f.domain,
       parameters: f.parameters ?? {},
       settings: f.settings ?? {},
-      bindings: f.bindings,
+      control: f.control,
+      dependencies: f.dependencies,
+      resources: f.resources,
       expectations: f.expectations,
       placement: f.placement,
       discovery: f.discovery,
@@ -408,7 +409,7 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
   for (const f of doc.spec.functions) {
     const prim = cat.get(f.type, f.typeVersion)!
     errors.push(...validateValue(prim.parameters.schema, f.parameters).map((e) => `${f.id}: ${e}`))
-    errors.push(...validateValue(settingsSchema(prim), f.settings ?? {}, 'settings').map((e) => `${f.id}: ${e}`))
+    errors.push(...setupProblems(f).map((e) => `${f.id}: ${e}`))
     // '1' needs its wire (each path, when a port has two); '1..n' needs at least one array element wired.
     const resolved = resolvePorts(prim.ports, f.parameters)
     for (const r of resolved)
@@ -417,11 +418,31 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
     for (const p of prim.ports.filter((q) => q.direction === 'in' && q.cardinality === '1..n'))
       if (!resolved.some((r) => r.id === p.id && fed.has(ref(f.id, r.key))))
         errors.push(`${f.id}: input ${p.id} must be connected`)
-    for (const d of prim.dependencies)
-      if (d.required && !f.bindings?.[d.name]) errors.push(`${f.id}: dependency "${d.name}" (${d.kind}) must be bound`)
     for (const other of [...(f.placement?.with ?? []), ...(f.placement?.apart ?? [])])
       if (!doc.spec.functions.some((g) => g.id === other)) errors.push(`${f.id}: placement refers to unknown function ${other}`)
   }
+  return errors
+}
+
+// An instance's own setup: vendor settings, control & health, dependencies, resources.
+export function setupProblems(f: Pick<FunctionInstance, 'settings' | 'control' | 'dependencies' | 'resources'>): string[] {
+  const errors: string[] = []
+  if (f.settings !== undefined && (typeof f.settings !== 'object' || f.settings === null || Array.isArray(f.settings)))
+    errors.push('vendor settings must be a JSON object')
+  const c = f.control ?? {}
+  if (!c.health || !['http', 'tcp', 'grpc', 'exec'].includes(c.health.type)) errors.push('a health check is required (http, tcp, grpc or exec)')
+  if (c.api && (!['nmos-is12', 'rest', 'grpc', 'websocket'].includes(c.api.type) || !(c.api.port > 0))) errors.push('control API needs a type and port')
+  if (c.nmos && !['node', 'device'].includes(c.nmos.registers)) errors.push('NMOS registers must be node or device')
+  const names = new Set<string>()
+  for (const d of f.dependencies ?? []) {
+    if (!d?.name || names.has(d.name)) errors.push('dependency names must be present and unique')
+    names.add(d?.name)
+    if (!DEPENDENCY_KINDS.includes(d?.kind)) errors.push(`dependency ${d?.name}: invalid kind`)
+    if (d?.kind === 'function' && !d.role) errors.push(`dependency ${d.name}: kind function needs a category`)
+    if (d?.required && !d.binding) errors.push(`dependency "${d.name}" (${d.kind}) must be bound`)
+  }
+  for (const [k, v] of Object.entries(f.resources ?? {}))
+    if (k === 'gpu' ? !(v as { class?: string })?.class : typeof v !== 'number' || v < 0) errors.push(`resources: invalid ${k}`)
   return errors
 }
 
@@ -465,7 +486,10 @@ function flowValues(schema: JsonSchema, params: JsonValue): Partial<Record<FlowF
 // Format of the flow written by `port`: the writer's parameters tagged with `x-flow` (e.g. a
 // receiver's output video format), else the workload defaults. Becomes the NMOS-style flow_def.json.
 function flowFormat(port: ResolvedPort, schema: JsonSchema, params: JsonValue, defaults: WorkloadDefaults): FlowFormat {
-  const v = flowValues(schema, params)
+  // A designed module's MXL output port "<block>.<essence>" takes its format from its own block.
+  const block = port.id.slice(0, port.id.indexOf('.'))
+  const own = block && schema.properties?.[block]
+  const v = own ? flowValues(own, getPath(params, block) ?? {}) : flowValues(schema, params)
   const mediaType = port.formats[0] ?? KNOWN_FORMATS[port.essence][0]
   const grainRate = parseRate(v.grainRate) ?? defaults.video.grainRate
   if (port.essence === 'audio') {
@@ -514,7 +538,7 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
         format: flowFormat(port, prim.parameters.schema, f.parameters, doc.spec.defaults),
         historyMs: opts.historyMs ?? historyMs,
         discovery: {
-          register: opts.register ?? f.discovery?.register ?? !!prim.control.nmos,
+          register: opts.register ?? f.discovery?.register ?? !!f.control?.nmos,
           ...(opts.labels?.length ? { labels: opts.labels } : {}),
         },
       })
@@ -532,13 +556,12 @@ export function toPublished(doc: WorkloadDescription, revision: number, cat: Cat
     return {
       ...f,
       ...(prim ? { parameters: withoutInapplicable(prim.parameters.schema, f.parameters) as FunctionInstance['parameters'] } : {}),
-      discovery: f.discovery ?? { register: !!prim?.control.nmos },
-      ...(prim?.resources ? { resources: prim.resources } : {}),
+      discovery: f.discovery ?? { register: !!f.control?.nmos },
     }
   })
   return {
     ...rest,
-    metadata: { ...doc.metadata, uid: workloadUid(doc.metadata), revision, libraryVersion: PRIMITIVE_LIBRARY.metadata.version },
+    metadata: { ...doc.metadata, uid: workloadUid(doc.metadata), revision, libraryVersion: LIBRARY.metadata.version },
     spec: { ...doc.spec, functions, flows: flowsOf(doc, cat) },
   }
 }

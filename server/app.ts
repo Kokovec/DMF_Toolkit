@@ -3,7 +3,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { checkCatalog, checkModule, ID_RE } from '../src/model/catalog'
 import type { ModuleCatalog, VendorModule, WorkloadDescription } from '../src/model/types'
-import { PRIMITIVE_LIBRARY } from '../src/model/primitives'
+import { LIBRARY } from '../src/model/library'
 import { checkWorkload, publishProblems, toPublished } from '../src/model/workload'
 import { HttpError, Store } from './db'
 
@@ -15,9 +15,9 @@ export function createApp(store: Store) {
   const route = (method: string, path: string, handler: Handler) =>
     routes.push({ method, pattern: new RegExp(`^${path.replace(/:\w+/g, '([^/]+)')}$`), handler })
 
-  // ---- Primitive library (read-only: versioned in git) ----
-  route('GET', '/api/library', () => PRIMITIVE_LIBRARY)
-  route('GET', '/api/library/versions', () => ({ current: PRIMITIVE_LIBRARY.metadata.version, versions: store.libraryVersions() }))
+  // ---- Feature library (read-only: versioned in git) ----
+  route('GET', '/api/library', () => LIBRARY)
+  route('GET', '/api/library/versions', () => ({ current: LIBRARY.metadata.version, versions: store.libraryVersions() }))
   route('GET', '/api/library/:version', ({ params: [version] }) => store.getLibrary(version))
 
   // ---- Vendor modules ----

@@ -1,7 +1,6 @@
 import { useCatalog } from '../api'
 import { EXTERNALS, REFERENCE_KINDS } from '../model/externals'
-import { settingsSchema, vendorConfig } from '../model/modules'
-import { roleLabel } from '../model/primitives'
+import { getCategory } from '../model/library'
 import { leafPaths } from '../model/schema'
 import type {
   Colorspace,
@@ -15,6 +14,7 @@ import type {
   WorkloadDefaults,
 } from '../model/types'
 import { DEFAULT_HISTORY_MS, moduleOf, rebind, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
+import { FunctionSetup } from './FunctionSetup'
 import { SchemaForm } from './SchemaForm'
 
 type Props = {
@@ -170,7 +170,7 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
       <aside className="inspector">
         <h2>{data.name}</h2>
         <p className="error-text">
-          Primitive {data.type}@{data.typeVersion} is not in the library.
+          Module {data.type}@{data.typeVersion} is not in the library.
         </p>
         <button className="danger" onClick={() => onDelete(id)}>
           Delete
@@ -178,14 +178,14 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
       </aside>
     )
 
-  const implementations = catalog.forRole(prim.role)
   const latest = catalog.get(prim.id)
+  const headings = prim.categories.map((c) => getCategory(c)?.name ?? c).join(', ')
 
   return (
     <aside className="inspector">
       <h2>{prim.name}</h2>
       <p className="hint">
-        {roleLabel(prim.role)} · {prim.vendor}{prim.product ? ` ${prim.product}` : ''} — {prim.description}
+        {headings} · {prim.vendor}{prim.product ? ` ${prim.product}` : ''} — {prim.description}
       </p>
 
       <label className="field">
@@ -198,21 +198,8 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
       </label>
 
       <label className="field">
-        <span>Module ({roleLabel(prim.role)})</span>
-        <select
-          value={prim.id}
-          onChange={(e) => {
-            const next = catalog.get(e.target.value)
-            if (next) onNodeChange(id, rebind(data, next))
-          }}
-        >
-          {!implementations.some((p) => p.id === prim.id) && <option value={prim.id}>{prim.name}</option>}
-          {implementations.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} — {p.vendor}
-            </option>
-          ))}
-        </select>
+        <span>Module</span>
+        <input value={`${prim.id}@${prim.version}`} readOnly />
       </label>
       {latest && latest.version !== prim.version && <UpgradeOffer from={prim} to={latest} onUpgrade={() => onNodeChange(id, rebind(data, latest))} />}
 
@@ -230,37 +217,7 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
         onChange={(parameters) => update({ parameters })}
       />
 
-      <h3>{prim.vendor} settings</h3>
-      <SchemaForm
-        key={`${id}:${prim.id}@${prim.version}:settings`}
-        schema={settingsSchema(prim)}
-        value={data.settings ?? {}}
-        onChange={(settings) => update({ settings })}
-      />
-
-      {prim.dependencies.length > 0 && (
-        <>
-          <h3>Dependencies</h3>
-          {prim.dependencies.map((d) => (
-            <label key={d.name} className="field">
-              <span>
-                {d.name} ({d.kind}
-                {d.role ? `: ${d.role}` : ''}){d.required && <span className="required">*</span>}
-              </span>
-              <input
-                placeholder={`${d.kind === 'function' ? 'instance' : d.kind}:name`}
-                value={data.bindings?.[d.name] ?? ''}
-                onChange={(e) => {
-                  const bindings = { ...data.bindings }
-                  if (e.target.value) bindings[d.name] = e.target.value
-                  else delete bindings[d.name]
-                  update({ bindings })
-                }}
-              />
-            </label>
-          ))}
-        </>
-      )}
+      <FunctionSetup key={id} data={data} vendor={prim.vendor} update={update} />
 
       <Intent data={data} prim={prim} others={nodes.filter((n) => n.data.kind === 'fn' && n.id !== id).map((n) => n.id)} update={update} />
 
@@ -276,7 +233,7 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
 // Read-only summary of what the orchestrator gets from the module. Image, compute, licences
 // and placement are the orchestrator's own decisions.
 function Contract({ prim, data }: { prim: VendorModule; data: FnData }) {
-  const c = prim.control
+  const c = data.control ?? {}
   const external = [...new Set(prim.ports.flatMap((p) => (p.transport === 'mxl' ? [] : [p.transport.external])))]
   const rows: [string, string][] = [
     ['Module', `${prim.id}@${prim.version}`],
@@ -284,7 +241,7 @@ function Contract({ prim, data }: { prim: VendorModule; data: FnData }) {
     ['Scaling', prim.capability.scaling],
   ]
   if (external.length) rows.push(['Edge', external.join(', ')])
-  const r = prim.resources
+  const r = data.resources
   if (r)
     rows.push([
       'Resources',
@@ -296,7 +253,7 @@ function Contract({ prim, data }: { prim: VendorModule; data: FnData }) {
         r.storageGiB && `${r.storageGiB} GiB`,
       ]
         .filter(Boolean)
-        .join(' · ') + ' (vendor profile)',
+        .join(' · '),
     ])
   if (c.api) rows.push(['Control API', `${c.api.type} :${c.api.port}${c.api.path ?? ''}`])
   if (c.nmos) rows.push(['NMOS', `registers as ${c.nmos.registers}`])
@@ -312,8 +269,11 @@ function Contract({ prim, data }: { prim: VendorModule; data: FnData }) {
           </div>
         ))}
       </dl>
-      <p className="hint">Configuration in {prim.vendor}'s terms, as the orchestrator will apply it:</p>
-      <pre className="json-preview">{JSON.stringify(vendorConfig(prim, data.parameters, data.settings ?? {}), null, 2)}</pre>
+      {(data.dependencies ?? []).map((d) => (
+        <p key={d.name} className="hint">
+          Dependency {d.name} ({d.kind}) → {d.binding ?? 'unbound'}
+        </p>
+      ))}
     </details>
   )
 }
@@ -390,8 +350,8 @@ function ReferenceFields({ data, onChange }: { data: ExtData; onChange: (r: Exte
 
 // What a newer version of the module changes, shown before upgrading an instance.
 function UpgradeOffer({ from, to, onUpgrade }: { from: VendorModule; to: VendorModule; onUpgrade: () => void }) {
-  const before = new Set([...leafPaths(from.parameters.schema), ...leafPaths(settingsSchema(from))])
-  const after = new Set([...leafPaths(to.parameters.schema), ...leafPaths(settingsSchema(to))])
+  const before = new Set(leafPaths(from.parameters.schema))
+  const after = new Set(leafPaths(to.parameters.schema))
   const added = [...after].filter((p) => !before.has(p))
   const removed = [...before].filter((p) => !after.has(p))
   return (
@@ -414,7 +374,7 @@ function UpgradeOffer({ from, to, onUpgrade }: { from: VendorModule; to: VendorM
 function Intent({ data, prim, others, update }: { data: FnData; prim: VendorModule; others: string[]; update: (p: Partial<FnData>) => void }) {
   const ex = data.expectations ?? {}
   const pl = data.placement ?? {}
-  const disc = data.discovery ?? { register: !!prim.control.nmos }
+  const disc = data.discovery ?? { register: !!data.control?.nmos }
   const setEx = (patch: Partial<Expectations>) => update({ expectations: clean({ ...ex, ...patch }) })
   const setPl = (patch: Partial<PlacementConstraints>) => update({ placement: clean({ ...pl, ...patch }) })
   const ids = (v: string) => {

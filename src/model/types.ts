@@ -1,7 +1,7 @@
 // Core data model: primitives (base types per category), vendor modules (deployable catalog entries)
 // and the published workload graph. Specs: docs/media-primitive.md, docs/primitives/.
 
-export const API_VERSION = 'dmf-toolkit/v1alpha2'
+export const API_VERSION = 'dmf-toolkit/v1alpha3'
 
 // Ids of primitives, modules, ports, catalogs: lowercase letters, digits, . _ -
 export const ID_RE = /^[a-z0-9][a-z0-9._-]*$/
@@ -94,50 +94,43 @@ export type HealthType = 'http' | 'tcp' | 'grpc' | 'exec'
 export type DependencyKind = 'tams' | 'license-server' | 'storage' | 'device' | 'function'
 export const DEPENDENCY_KINDS: DependencyKind[] = ['tams', 'license-server', 'storage', 'device', 'function']
 
+// Something non-media a function instance cannot start without, and the facility resource it's bound to.
 export type Dependency = {
-  name: string // slot name, bound per instance
+  name: string
   kind: DependencyKind
   required: boolean
-  role?: string // kind 'function': primitive that must be up first
+  role?: string // kind 'function': category of a function that must be up first
+  binding?: string // facility resource name, e.g. "tams:main" (required ones must be bound to publish)
 }
 
-// Where a core parameter goes in the vendor's configuration: `core` and `vendor` are dot paths;
-// `values` translates core values into the vendor's (e.g. "1920x1080" -> 3). Mapped vendor keys
-// are filled from the core value, so designers never set them twice.
-export type CoreMapping = { core: string; vendor: string; values?: Record<string, JsonValue> }
+// How the orchestrator controls and health-checks a function instance.
+export type ControlSpec = {
+  api?: { type: ControlApiType; port: number; path?: string }
+  nmos?: { registers: 'node' | 'device' }
+  health?: { type: HealthType; port?: number; path?: string } // required to publish
+}
 
-// A media function from one vendor, built from a primitive (catalog entry). It describes what the
-// function is and how it connects; how and where it runs (image, compute, licences, placement)
-// is the orchestrator's job (decision 2026-10-10).
+// A media function product from one vendor (catalog entry), designed from library features. It
+// describes what the function is and how it connects. Vendor settings, control & health,
+// dependencies and resources are per instance (FunctionInstance); how and where it runs is the
+// orchestrator's job. `ports` and `parameters` are derived from
+// `design` (composeModule) and stored for the orchestrator's convenience.
 export type VendorModule = {
   // 1. Identity & capability
   id: string
   version: string
   name: string
   description: string
-  role: string
+  categories: string[] // palette headings it appears under (one or more)
   vendor: string
   product?: string
   productVersion?: string
   capability: { produces: Essence[]; consumes: Essence[]; scaling: Scaling }
-  // 2. Media ports
+  // 2. Design: blocks, add-ons, chain links, module-wide features
+  design: ModuleDesign
+  // Derived from the design: ports and the core parameter schema (one group per block)
   ports: PortDef[]
-  // 3. Core parameters: the primitive's common vocabulary (may only narrow). The configurator
-  //    understands these (wiring, formats, vendor swaps).
   parameters: { schema: JsonSchema }
-  // 4. Vendor settings: the vendor's own configuration, mirrored with its own names and structure,
-  //    plus how core parameters land in it. The orchestrator passes settings through unchanged.
-  vendorSettings: { schema: JsonSchema; mapping: CoreMapping[] }
-  // 5. Control & health
-  control: {
-    api?: { type: ControlApiType; port: number; path?: string }
-    nmos?: { registers: 'node' | 'device' }
-    health: { type: HealthType; port?: number; path?: string }
-  }
-  // Vendor-declared resource profile (requirement for the orchestrator's sizing)
-  resources?: ResourceProfile
-  // 6. Dependencies
-  dependencies: Dependency[]
 }
 
 export type ModuleCatalog = {
@@ -152,7 +145,7 @@ export type ModuleCatalog = {
 // ---- Desired-state contract with the orchestrator (docs/orchestrator-contract.md) ----
 // The configurator declares intent, requirements and constraints; the orchestrator decides and acts.
 
-// What a function needs to run well, as declared by the vendor (a requirement, not an allocation).
+// What a function instance needs to run well (a requirement, not an allocation).
 export type ResourceProfile = {
   cpu?: number // cores
   memoryMiB?: number
@@ -216,13 +209,14 @@ export type FunctionInstance = {
   name: string
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
-  settings?: { [key: string]: JsonValue } // vendor settings (vendor's own names); mapped keys omitted
-  bindings?: Record<string, string> // dependency slot -> facility resource name
+  settings?: { [key: string]: JsonValue } // the vendor's own configuration (free-form), passed through unchanged
+  control?: ControlSpec
+  dependencies?: Dependency[]
   expectations?: Expectations
   placement?: PlacementConstraints
   discovery?: Discovery
   flowOptions?: Record<string, FlowOptions> // by output port
-  resources?: ResourceProfile // published: the module's profile, for the orchestrator's sizing
+  resources?: ResourceProfile // what this instance needs (a requirement for the orchestrator's sizing)
 }
 
 // Canvas-only devices outside the facility (not deployed).
@@ -264,45 +258,60 @@ export type WorkloadDescription = {
   layout?: { nodes: Record<string, { x: number; y: number }> }
 }
 
-// ---- Primitives: base types per category, from which vendor modules are built ----
-// (A VendorModule is built from a primitive; its `role` names the primitive.)
+// ---- Feature library: the building blocks modules are designed from (src/model/library.json) ----
 
 export type CategoryDef = { id: string; name: string; description: string }
 
-// Port shape of a primitive. `side: 'external'` = faces the outside world; the module picks
-// the transport (ST 2110, SRT, …) and formats.
-export type PortTemplate = {
-  id: string
-  direction: 'in' | 'out'
-  essence: Essence
-  label?: string
-  cardinality: Cardinality
-  arraySize?: string
-  timeContext?: string
-  side: 'external' | 'mxl'
-  // External port whose essence the module author picks: the module's port id becomes
-  // "<id>.<essence>", e.g. "in" -> "in.video" (video feed with its audio/ANC) or "in.audio".
-  essenceOptions?: Essence[]
-  // Protocols that need two legs on this port (seamless protection, e.g. ST 2022-7): the port
-  // becomes "<id>.a" and "<id>.b", both required.
-  dualFor?: ExternalTransport[]
-  // Per-instance second path (e.g. SRT bonding): see PortDef.dualWhen.
-  dualWhen?: Record<string, (string | number | boolean)[]>
-  // Only present when the module's chosen input essence is one of these (e.g. out.video only
-  // for video feeds).
-  whenInput?: Essence[]
+// What travels along a module's internal signal chain between blocks.
+export type ChainType = 'stream' | 'media' // compressed stream | decoded media
+
+// A building block or add-on, with its design rules. Data in the versioned library.
+export type FeatureDef = {
+  id: string // e.g. "input.srt", "option.bonding", "decoder", "codec.hevc", "output.mxl", "module.latency"
+  name: string
+  description: string
+  group: string // sidebar group (featureGroups)
+  // block: a node in the module's signal chain; addon: dropped onto a block; module: module-wide;
+  // option: built into the blocks that include it, set per instance in the workload designer
+  kind: 'block' | 'addon' | 'module' | 'option'
+  input?: ChainType // block: what it takes from the chain (absent = starts a chain)
+  output?: ChainType // block: what it passes on (absent = ends a chain)
+  // block facing the outside world: one external port per block, protocol fixed by the feature
+  external?: {
+    direction: 'in' | 'out'
+    protocol: ExternalTransport
+    essenceOptions: Essence[] // the author picks per block: video feed (with its audio/ANC) or audio-only
+    dual?: 'always' // two legs .a/.b (e.g. 2022-7)
+    dualWhen?: Record<string, (string | number | boolean)[]> // second path per instance (block-relative keys)
+  }
+  mxlOutputs?: boolean // block publishes MXL flows (video/audio/ANC per the upstream feed)
+  essence?: Essence // codec add-ons: video or audio codec
+  includes?: string[] // block: options always part of it (e.g. SRT bonding, network constraints, payload)
+  key?: string // parameter group name inside the block (e.g. "srt", "network")
+  merge?: string // add-on / option: merge its parameters into this group of the block instead (e.g. bonding -> "srt")
+  parameters?: { schema: JsonSchema }
+  rules?: {
+    attachTo?: string[] // add-on: feature ids it can attach to ("input.*" = any input)
+    maxPerBlock?: number // add-on: how many times per block
+    maxPerModule?: number
+    needsAddon?: { group: string; min: number; message: string }[] // block: required add-ons
+  }
 }
 
-export type PrimitiveDef = {
-  id: string // "<category>.<name>", e.g. "acquisition.receiver"; models use it as their role
-  category: string
-  name: string // singular, e.g. "Receiver"
-  plural: string // sub-heading, e.g. "Receivers"
-  description: string
-  ports: PortTemplate[]
-  // Protocols a module may choose for its external ports (one per module); default: all.
-  protocols?: ExternalTransport[]
-  parameters: { schema: JsonSchema } // shared by every module of this primitive
+// One block of a module's design.
+export type ModuleBlock = {
+  id: string // e.g. "srt1"; prefixes the block's ports and parameters
+  feature: string
+  addons: string[]
+  essence?: Essence // blocks with an external port: video feed or audio-only feed
+}
+
+// The module's design: signal-chain blocks, links between them, module-wide features, layout.
+export type ModuleDesign = {
+  blocks: ModuleBlock[]
+  links: { from: string; to: string }[]
+  moduleFeatures: string[]
+  layout?: Record<string, { x: number; y: number }>
 }
 
 // Shared vocabulary of the library: data, so new protocols, formats or device kinds need no code.
@@ -313,9 +322,15 @@ export type Vocabulary = {
   references: { id: ExternalRefKind; label: string; source: string; destination: string }[]
 }
 
-export type PrimitiveLibrary = {
+export type FeatureLibrary = {
   apiVersion: typeof API_VERSION
-  kind: 'PrimitiveLibrary'
+  kind: 'FeatureLibrary'
   metadata: { version: string; description?: string } // bump on every change
-  spec: { vocabulary: Vocabulary; categories: CategoryDef[]; primitives: PrimitiveDef[] }
+  spec: {
+    vocabulary: Vocabulary
+    categories: CategoryDef[]
+    chainTypes: { id: ChainType; name: string }[]
+    featureGroups: { id: string; name: string; description?: string }[]
+    features: FeatureDef[]
+  }
 }

@@ -209,6 +209,7 @@ export type FunctionInstance = {
   name: string
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
+  inputs?: InputSelection // which input blocks this instance uses, and how many copies of each
   settings?: { [key: string]: JsonValue } // the vendor's own configuration (free-form), passed through unchanged
   control?: ControlSpec
   dependencies?: Dependency[]
@@ -300,13 +301,22 @@ export type ModuleBlock = {
   feature: string
   addons: string[]
   essence?: Essence // blocks with ports: video feed (with its audio/ANC) or audio-only feed
+  scaleOut?: number // input blocks: up to this many copies per instance (default 1)
 }
+
+export type InputRule = 'one' | 'several'
+
+// Copies of each input block an instance uses (block id -> count; 0 = not used).
+export type InputSelection = Record<string, number>
 
 // The module's design: the functions it offers (blocks with their add-ons) and module-wide
 // features. No wiring: how functions are used and configured is up to the workload.
 export type ModuleDesign = {
   blocks: ModuleBlock[]
   moduleFeatures: string[]
+  // Which inputs an instance may use: exactly one input block, or several (default). Each used
+  // input can be scaled out up to its block's `scaleOut`. Chosen per instance in the workload.
+  inputRule?: InputRule
   layout?: Record<string, { x: number; y: number }> // workspace positions (block id, or "module:<feature>")
 }
 

@@ -1,6 +1,7 @@
 import { useCatalog } from '../api'
 import { EXTERNALS, REFERENCE_KINDS } from '../model/externals'
-import { getCategory } from '../model/library'
+import { inputBlocks, inputsOf, inputSelectionProblems } from '../model/compose'
+import { getCategory, getFeature } from '../model/library'
 import { leafPaths } from '../model/schema'
 import type {
   Colorspace,
@@ -9,11 +10,12 @@ import type {
   ExternalReference,
   FlowDef,
   FlowOptions,
+  InputSelection,
   PlacementConstraints,
   VendorModule,
   WorkloadDefaults,
 } from '../model/types'
-import { DEFAULT_HISTORY_MS, moduleOf, rebind, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
+import { DEFAULT_HISTORY_MS, moduleOf, rebind, schemaOf, withInputs, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
 import { FunctionSetup } from './FunctionSetup'
 import { SchemaForm } from './SchemaForm'
 
@@ -209,10 +211,12 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
         <span className="hint">Logical isolation group for this function's flows; the orchestrator creates and places it.</span>
       </label>
 
+      <InputChoice data={data} prim={prim} onChange={(inputs) => onNodeChange(id, withInputs(data, prim, inputs))} />
+
       <h3>Core parameters</h3>
       <SchemaForm
-        key={`${id}:${prim.id}@${prim.version}`}
-        schema={prim.parameters.schema}
+        key={`${id}:${prim.id}@${prim.version}:${JSON.stringify(data.inputs ?? null)}`}
+        schema={schemaOf(prim, data)}
         value={data.parameters}
         onChange={(parameters) => update({ parameters })}
       />
@@ -344,6 +348,53 @@ function ReferenceFields({ data, onChange }: { data: ExtData; onChange: (r: Exte
         The orchestrator turns this into addresses, SDP files and connections. Caller/listener mode, latency and secrets are set
         on the receiver (its ingress parameters).
       </p>
+    </>
+  )
+}
+
+// Which of the module's inputs this instance uses, and how many copies of each (scale-out), within
+// the module's input rules. Only shown when there is a choice to make.
+function InputChoice({ data, prim, onChange }: { data: FnData; prim: VendorModule; onChange: (inputs: InputSelection) => void }) {
+  const inputs = inputBlocks(prim.design)
+  if (inputs.length < 2 && !inputs.some((b) => (b.scaleOut ?? 1) > 1)) return null
+  const one = prim.design.inputRule === 'one'
+  const sel = inputsOf(prim.design, data.inputs)
+  const problems = inputSelectionProblems(prim.design, data.inputs)
+  const set = (id: string, n: number) => onChange({ ...sel, [id]: n })
+  const pick = (id: string) => onChange(Object.fromEntries(inputs.map((b) => [b.id, b.id === id ? Math.max(1, sel[id] ?? 0) : 0])))
+  return (
+    <>
+      <h3>Inputs</h3>
+      <p className="hint">
+        {one ? 'This module uses exactly one of its inputs per instance.' : 'This module can use several of its inputs per instance.'}
+        {inputs.some((b) => (b.scaleOut ?? 1) > 1) && ' Some inputs scale out: set how many of each.'}
+      </p>
+      {inputs.map((b) => {
+        const name = getFeature(b.feature)?.name ?? b.feature
+        const n = sel[b.id] ?? 0
+        const max = b.scaleOut ?? 1
+        return (
+          <div key={b.id} className="input-choice">
+            <label className="field-check">
+              <input
+                type={one ? 'radio' : 'checkbox'}
+                name={`inputs-${prim.id}`}
+                checked={n > 0}
+                onChange={(e) => (one ? pick(b.id) : set(b.id, e.target.checked ? 1 : 0))}
+              />{' '}
+              {name} <span className="hint">{b.id}</span>
+            </label>
+            {max > 1 && n > 0 && (
+              <label className="input-count">
+                ×
+                <input type="number" min={1} max={max} value={n} onChange={(e) => set(b.id, Math.min(max, Math.max(1, e.target.valueAsNumber || 1)))} />
+                <span className="hint">of {max}</span>
+              </label>
+            )}
+          </div>
+        )
+      })}
+      {problems.length > 0 && <p className="error-text">{problems.join('; ')}</p>}
     </>
   )
 }

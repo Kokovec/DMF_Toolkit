@@ -2,6 +2,7 @@ import type { Edge, Node } from '@xyflow/react'
 import { currentCatalog, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
 import { EXTERNALS } from './externals'
 import { KNOWN_FORMATS } from './vocabulary'
+import { inputBlocks, inputsOf, inputSelectionProblems, instanceParts } from './compose'
 import { LIBRARY } from './library'
 import { defaultsFor, getPath, leafPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
@@ -20,6 +21,7 @@ import {
   type FlowFormat,
   type FlowOptions,
   type FunctionInstance,
+  type InputSelection,
   type JsonSchema,
   type JsonValue,
   type PlacementConstraints,
@@ -40,6 +42,7 @@ export type FnData = {
   name: string
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
+  inputs?: InputSelection // input blocks used and their copies; absent = the module's default
   settings: { [key: string]: JsonValue } // the vendor's own configuration (free-form)
   control?: ControlSpec
   dependencies?: Dependency[]
@@ -77,7 +80,18 @@ export function moduleOf(data: FnData, cat: Catalog = currentCatalog()): VendorM
 export function portsOf(data: FnData | ExtData, cat: Catalog = currentCatalog()): ResolvedPort[] {
   if (data.kind === 'ext') return resolvePorts(EXTERNALS[data.extKind]?.ports ?? [], {})
   const prim = moduleOf(data, cat)
-  return prim ? resolvePorts(prim.ports, data.parameters) : []
+  return prim ? resolvePorts(instanceParts(prim, data.inputs).ports, data.parameters) : []
+}
+
+// The core parameter schema of one instance: only its inputs, repeated when scaled out.
+export function schemaOf(prim: VendorModule, data: Pick<FnData, 'inputs'>): JsonSchema {
+  return instanceParts(prim, data.inputs).schema
+}
+
+// Change which inputs an instance uses: parameters follow (new copies start from defaults,
+// values of inputs that stay keep theirs). Wires to ports that go away are pruned by the caller.
+export function withInputs(data: FnData, prim: VendorModule, inputs: InputSelection): FnData {
+  return { ...data, inputs, parameters: carryOver(instanceParts(prim, inputs).schema, data.parameters) }
 }
 
 export function ref(node: string, port: string) {
@@ -104,7 +118,7 @@ export function newFunctionData(prim: VendorModule, name: string): FnData {
     typeVersion: prim.version,
     name,
     domain: DEFAULT_DOMAIN,
-    parameters: (defaultsFor(prim.parameters.schema) as { [k: string]: JsonValue }) ?? {},
+    parameters: (defaultsFor(instanceParts(prim).schema) as { [k: string]: JsonValue }) ?? {},
     settings: {},
     control: { health: { type: 'http', port: 8080, path: '/healthz' } },
   }
@@ -128,7 +142,9 @@ function carryOver(schema: JsonSchema, old: JsonValue | undefined): { [k: string
 // same blocks and keys (same feature vocabulary). The instance's own setup (vendor settings,
 // control & health, dependencies, resources) stays as it is.
 export function rebind(data: FnData, prim: VendorModule): FnData {
-  return { ...data, type: prim.id, typeVersion: prim.version, parameters: carryOver(prim.parameters.schema, data.parameters) }
+  // the input selection carries over if the new module still accepts it, else its default applies
+  const inputs = data.inputs && !inputSelectionProblems(prim.design, data.inputs).length ? data.inputs : undefined
+  return { ...data, type: prim.id, typeVersion: prim.version, inputs, parameters: carryOver(instanceParts(prim, inputs).schema, data.parameters) }
 }
 
 // ---- Wiring ----
@@ -280,6 +296,7 @@ export function toWorkload(
       domain: d.domain || DEFAULT_DOMAIN,
       parameters: d.parameters,
     }
+    if (d.inputs) fn.inputs = d.inputs
     if (d.settings && Object.keys(d.settings).length) fn.settings = d.settings
     if (d.control && Object.keys(d.control).length) fn.control = d.control
     if (d.dependencies?.length) fn.dependencies = d.dependencies
@@ -318,6 +335,7 @@ export function fromWorkload(doc: WorkloadDescription): {
       name: f.name,
       domain: f.domain,
       parameters: f.parameters ?? {},
+      inputs: f.inputs,
       settings: f.settings ?? {},
       control: f.control,
       dependencies: f.dependencies,
@@ -408,14 +426,16 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
   const fed = new Set(doc.spec.wires.map((w) => w.to))
   for (const f of doc.spec.functions) {
     const prim = cat.get(f.type, f.typeVersion)!
-    errors.push(...validateValue(prim.parameters.schema, f.parameters).map((e) => `${f.id}: ${e}`))
+    const parts = instanceParts(prim, f.inputs)
+    errors.push(...inputSelectionProblems(prim.design, f.inputs).map((e) => `${f.id}: ${e}`))
+    errors.push(...validateValue(parts.schema, f.parameters).map((e) => `${f.id}: ${e}`))
     errors.push(...setupProblems(f).map((e) => `${f.id}: ${e}`))
     // '1' needs its wire (each path, when a port has two); '1..n' needs at least one array element wired.
-    const resolved = resolvePorts(prim.ports, f.parameters)
+    const resolved = resolvePorts(parts.ports, f.parameters)
     for (const r of resolved)
       if (r.direction === 'in' && r.cardinality === '1' && !fed.has(ref(f.id, r.key)))
         errors.push(`${f.id}: input ${r.label && r.key !== r.id ? `${r.key} (${r.label})` : r.key} must be connected`)
-    for (const p of prim.ports.filter((q) => q.direction === 'in' && q.cardinality === '1..n'))
+    for (const p of parts.ports.filter((q) => q.direction === 'in' && q.cardinality === '1..n'))
       if (!resolved.some((r) => r.id === p.id && fed.has(ref(f.id, r.key))))
         errors.push(`${f.id}: input ${p.id} must be connected`)
     for (const other of [...(f.placement?.with ?? []), ...(f.placement?.apart ?? [])])
@@ -522,7 +542,8 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
   for (const f of doc.spec.functions) {
     const prim = cat.get(f.type, f.typeVersion)
     if (!prim) continue
-    for (const port of resolvePorts(prim.ports, f.parameters)) {
+    const parts = instanceParts(prim, f.inputs)
+    for (const port of resolvePorts(parts.ports, f.parameters)) {
       if (port.direction !== 'out' || port.transport !== 'mxl') continue
       const writer = ref(f.id, port.key)
       const readers = doc.spec.wires.filter((w) => w.from === writer).map((w) => w.to)
@@ -535,7 +556,7 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
         essence: port.essence,
         writer,
         readers,
-        format: flowFormat(port, prim.parameters.schema, f.parameters, doc.spec.defaults),
+        format: flowFormat(port, parts.schema, f.parameters, doc.spec.defaults),
         historyMs: opts.historyMs ?? historyMs,
         discovery: {
           register: opts.register ?? f.discovery?.register ?? !!f.control?.nmos,
@@ -555,7 +576,13 @@ export function toPublished(doc: WorkloadDescription, revision: number, cat: Cat
     const prim = cat.get(f.type, f.typeVersion)
     return {
       ...f,
-      ...(prim ? { parameters: withoutInapplicable(prim.parameters.schema, f.parameters) as FunctionInstance['parameters'] } : {}),
+      ...(prim
+        ? {
+            parameters: withoutInapplicable(instanceParts(prim, f.inputs).schema, f.parameters) as FunctionInstance['parameters'],
+            // the selection in force, so the orchestrator knows which inputs (and how many) to run
+            ...(inputBlocks(prim.design).length ? { inputs: inputsOf(prim.design, f.inputs) } : {}),
+          }
+        : {}),
       discovery: f.discovery ?? { register: !!f.control?.nmos },
     }
   })

@@ -17,10 +17,10 @@ import {
   type NodeChange,
   type NodeProps,
 } from '@xyflow/react'
-import { canAddFeature, canAttach, designProblems, feedOptions, newBlockId } from '../model/compose'
+import { canAddFeature, canAttach, designProblems, feedOptions, inputBlocks, isInputFeature, MAX_SCALE_OUT, newBlockId } from '../model/compose'
 import { getFeature, LIBRARY, featuresIn } from '../model/library'
 import { TRANSPORT_LABELS } from '../model/vocabulary'
-import type { Essence, FeatureDef, ModuleBlock, ModuleDesign } from '../model/types'
+import type { Essence, FeatureDef, InputRule, ModuleBlock, ModuleDesign } from '../model/types'
 
 const FEATURE_MIME = 'application/x-dmf-feature'
 
@@ -220,7 +220,16 @@ function Designer({ design, onChange, locked }: Props) {
               </button>
             </p>
           )}
-          {block && <BlockDetails block={block} locked={locked} onEssence={(e) => setBlock(block.id, { essence: e })} onRemoveAddon={(i) => removeAddon(block.id, i)} />}
+          {block && (
+            <BlockDetails
+              block={block}
+              locked={locked}
+              onEssence={(e) => setBlock(block.id, { essence: e })}
+              onScaleOut={(n) => setBlock(block.id, { scaleOut: n > 1 ? n : undefined })}
+              onRemoveAddon={(i) => removeAddon(block.id, i)}
+            />
+          )}
+          <InputRules design={design} locked={locked} onRule={(inputRule) => update({ inputRule })} onScaleOut={(id, n) => setBlock(id, { scaleOut: n > 1 ? n : undefined })} />
           <div className={`rules ${problems.length ? 'open' : 'ok'}`}>
             {problems.length ? (
               <>
@@ -312,6 +321,7 @@ function BlockNode({ data, selected }: NodeProps<Node<BlockNodeData, 'block'>>) 
         <div className="design-block-io">
           {io.join(' · ')}
           {feeds && ` · ${feed === 'audio' ? 'audio' : 'video'}`}
+          {(b.scaleOut ?? 1) > 1 && ` · up to ×${b.scaleOut}`}
         </div>
       )}
       {b.addons.length > 0 && (
@@ -359,7 +369,15 @@ const nodeTypes = { block: BlockNode, module: ModuleNode }
 
 // ---- The selected function (under the workspace) ----
 
-function BlockDetails({ block, locked, onEssence, onRemoveAddon }: { block: ModuleBlock; locked?: boolean; onEssence: (e: Essence) => void; onRemoveAddon: (i: number) => void }) {
+type DetailsProps = {
+  block: ModuleBlock
+  locked?: boolean
+  onEssence: (e: Essence) => void
+  onScaleOut: (n: number) => void
+  onRemoveAddon: (i: number) => void
+}
+
+function BlockDetails({ block, locked, onEssence, onScaleOut, onRemoveAddon }: DetailsProps) {
   const f = getFeature(block.feature)
   if (!f) return null
   const feeds = feedOptions(f)
@@ -385,6 +403,13 @@ function BlockDetails({ block, locked, onEssence, onRemoveAddon }: { block: Modu
             </select>
           </label>
         )}
+        {isInputFeature(f) && (
+          <label className="field">
+            <span>Scale out</span>
+            <ScaleOut value={block.scaleOut ?? 1} locked={locked} onChange={onScaleOut} />
+            <span className="hint">copies of this input one instance may run (1 = no scaling)</span>
+          </label>
+        )}
         {block.addons.length > 0 && (
           <div className="field">
             <span>Add-ons</span>
@@ -405,6 +430,68 @@ function BlockDetails({ block, locked, onEssence, onRemoveAddon }: { block: Modu
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function ScaleOut({ value, locked, onChange }: { value: number; locked?: boolean; onChange: (n: number) => void }) {
+  return (
+    <input
+      type="number"
+      min={1}
+      max={MAX_SCALE_OUT}
+      value={value}
+      disabled={locked}
+      onChange={(e) => onChange(Math.min(MAX_SCALE_OUT, Math.max(1, Math.floor(e.target.valueAsNumber) || 1)))}
+    />
+  )
+}
+
+// ---- Input rules (under the workspace): which inputs an instance may use, and scale-out ----
+
+type RulesProps = { design: ModuleDesign; locked?: boolean; onRule: (r: InputRule) => void; onScaleOut: (id: string, n: number) => void }
+
+function InputRules({ design, locked, onRule, onScaleOut }: RulesProps) {
+  const inputs = inputBlocks(design)
+  if (!inputs.length) return null
+  const rule = design.inputRule ?? 'several'
+  return (
+    <div className="block-details input-rules">
+      <div className="block-details-head">
+        <strong>Input rules</strong>
+        <span className="feature-rule">what each instance may choose in the workload designer</span>
+      </div>
+      {inputs.length > 1 && (
+        <div className="row-actions">
+          <label className="field-check">
+            <input type="radio" name="input-rule" checked={rule === 'one'} disabled={locked} onChange={() => onRule('one')} /> Exactly one input per instance
+          </label>
+          <label className="field-check">
+            <input type="radio" name="input-rule" checked={rule === 'several'} disabled={locked} onChange={() => onRule('several')} /> Several inputs per instance
+            (of different types)
+          </label>
+        </div>
+      )}
+      <table className="edit-table">
+        <thead>
+          <tr>
+            <th>Input</th>
+            <th>Scale out (max copies per instance)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {inputs.map((b) => (
+            <tr key={b.id}>
+              <td>
+                {getFeature(b.feature)?.name ?? b.feature} <span className="hint">{b.id}</span>
+              </td>
+              <td>
+                <ScaleOut value={b.scaleOut ?? 1} locked={locked} onChange={(n) => onScaleOut(b.id, n)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

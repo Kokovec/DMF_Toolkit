@@ -3,7 +3,7 @@
 // never drift from its design.
 import { getFeature, matchesFeature } from './library'
 import { KNOWN_FORMATS, TRANSPORT_LABELS } from './vocabulary'
-import type { Essence, FeatureDef, JsonSchema, ModuleBlock, ModuleDesign, PortDef } from './types'
+import type { Essence, FeatureDef, InputSelection, JsonSchema, ModuleBlock, ModuleDesign, PortDef, VendorModule } from './types'
 
 export const BLOCK_ID_RE = /^[a-z][a-z0-9-]*$/ // no dots: block ids prefix port and parameter paths
 
@@ -156,6 +156,73 @@ export function composeModule(design: ModuleDesign): { ports: PortDef[]; schema:
   return { ports: design.blocks.flatMap(blockPorts), schema: { type: 'object', properties } }
 }
 
+// ---- Inputs: which ones an instance uses, and scaling out ----
+
+export const MAX_SCALE_OUT = 64
+
+export function isInputFeature(f: FeatureDef | undefined): boolean {
+  return !!f && (f.external?.direction === 'in' || !!f.mxlInputs)
+}
+
+export function inputBlocks(design: ModuleDesign): ModuleBlock[] {
+  return design.blocks.filter((b) => isInputFeature(getFeature(b.feature)))
+}
+
+// What a new instance uses: the first input for "one", every input once for "several".
+export function defaultInputs(design: ModuleDesign): InputSelection {
+  const inputs = inputBlocks(design)
+  return Object.fromEntries(inputs.map((b, i) => [b.id, design.inputRule === 'one' ? (i === 0 ? 1 : 0) : 1]))
+}
+
+// The selection in force: the instance's own, or the default.
+export function inputsOf(design: ModuleDesign, chosen?: InputSelection): InputSelection {
+  return chosen ?? defaultInputs(design)
+}
+
+// An instance's selection against the module's input rules.
+export function inputSelectionProblems(design: ModuleDesign, chosen?: InputSelection): string[] {
+  const inputs = inputBlocks(design)
+  if (!inputs.length) return []
+  const sel = inputsOf(design, chosen)
+  const errors: string[] = []
+  for (const id of Object.keys(sel)) if (!inputs.some((b) => b.id === id)) errors.push(`inputs: the module has no input ${id}`)
+  for (const b of inputs) {
+    const n = sel[b.id] ?? 0
+    const max = b.scaleOut ?? 1
+    if (!Number.isInteger(n) || n < 0 || n > max) errors.push(`inputs: ${label(b)} can be used 0 to ${max} times`)
+  }
+  const used = inputs.filter((b) => (sel[b.id] ?? 0) > 0)
+  if (design.inputRule === 'one' && used.length !== 1) errors.push('inputs: choose exactly one input')
+  if (design.inputRule !== 'one' && !used.length) errors.push('inputs: choose at least one input')
+  return errors
+}
+
+// Id of the k-th copy of a scaled-out block (k >= 2): "srt1_2". Block ids never contain "_".
+export const copyId = (blockId: string, k: number) => (k === 1 ? blockId : `${blockId}_${k}`)
+
+// The design as one instance runs it: unused inputs dropped, scaled-out inputs repeated.
+export function instanceDesign(design: ModuleDesign, chosen?: InputSelection): ModuleDesign {
+  const sel = inputsOf(design, chosen)
+  const blocks = design.blocks.flatMap((b) => {
+    if (!isInputFeature(getFeature(b.feature))) return [b]
+    const n = Math.max(0, Math.min(sel[b.id] ?? 0, b.scaleOut ?? 1))
+    return Array.from({ length: n }, (_, i) => ({ ...b, id: copyId(b.id, i + 1) }))
+  })
+  return { ...design, blocks }
+}
+
+// Ports and core parameter schema of one instance (cached per module object and selection).
+const partsCache = new WeakMap<VendorModule, Map<string, { ports: PortDef[]; schema: JsonSchema }>>()
+export function instanceParts(m: VendorModule, chosen?: InputSelection): { ports: PortDef[]; schema: JsonSchema } {
+  if (!inputBlocks(m.design).length) return { ports: m.ports, schema: m.parameters.schema }
+  let byKey = partsCache.get(m)
+  if (!byKey) partsCache.set(m, (byKey = new Map()))
+  const key = JSON.stringify(inputsOf(m.design, chosen))
+  let parts = byKey.get(key)
+  if (!parts) byKey.set(key, (parts = composeModule(instanceDesign(m.design, chosen))))
+  return parts
+}
+
 // ---- Whole-design rules (listed until fixed; saving is blocked while any remain) ----
 
 export function designProblems(design: ModuleDesign): string[] {
@@ -194,6 +261,14 @@ export function designProblems(design: ModuleDesign): string[] {
     if (f?.rules?.maxPerModule !== undefined && used > f.rules.maxPerModule) errors.push(`${f.name}: at most ${f.rules.maxPerModule} per module`)
   }
   for (const m of design.moduleFeatures) if (getFeature(m)?.kind !== 'module') errors.push(`"${m}" is not a module-wide feature`)
+  // input rules
+  if (design.inputRule !== undefined && !['one', 'several'].includes(design.inputRule)) errors.push('input rule must be "one" or "several"')
+  for (const b of design.blocks)
+    if (b.scaleOut !== undefined) {
+      if (!isInputFeature(getFeature(b.feature))) errors.push(`${label(b)}: only inputs can be scaled out`)
+      else if (!Number.isInteger(b.scaleOut) || b.scaleOut < 1 || b.scaleOut > MAX_SCALE_OUT)
+        errors.push(`${label(b)}: scale-out must be 1 to ${MAX_SCALE_OUT}`)
+    }
   if (design.blocks.length && !composeModule(design).ports.length) errors.push('The module has no inputs or outputs yet')
   return errors
 }

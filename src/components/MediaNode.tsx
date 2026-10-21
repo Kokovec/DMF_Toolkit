@@ -3,6 +3,7 @@ import { Handle, Position, useEdges, useUpdateNodeInternals, type NodeProps } fr
 import { useCatalog } from '../api'
 import { isEdge, isRequired, resolvePorts, transportLabel, type ResolvedPort } from '../model/catalog'
 import { EXTERNALS } from '../model/externals'
+import { instanceParts } from '../model/compose'
 import { getCategory } from '../model/library'
 import { defaultsFor } from '../model/schema'
 import type { JsonValue, VendorModule } from '../model/types'
@@ -36,7 +37,7 @@ export function ExternalNode({ id, data, selected }: NodeProps<ExtNode>) {
   )
 }
 
-// A module as it would appear on the canvas with default parameters (parts editor preview).
+// A module as a new instance would appear on the canvas: default inputs and parameters (parts editor preview).
 export function ModulePreview({ id, prim, params }: { id: string; prim: VendorModule; params?: { [k: string]: JsonValue } }) {
   return (
     <NodeView
@@ -44,7 +45,7 @@ export function ModulePreview({ id, prim, params }: { id: string; prim: VendorMo
       className={nodeClass(prim)}
       title={prim.name || 'Unnamed'}
       subtitle={`${prim.categories.map((c) => getCategory(c)?.name ?? c).join(', ') || 'no category'} · ${prim.vendor || 'vendor?'}`}
-      ports={resolvePorts(prim.ports, params ?? defaultsFor(prim.parameters.schema))}
+      ports={resolvePorts(instanceParts(prim).ports, params ?? defaultsFor(instanceParts(prim).schema))}
     />
   )
 }

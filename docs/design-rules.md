@@ -67,9 +67,19 @@ primitives still existed; the parameters now live on features). `media-primitive
   default parameters. *Enforced by:* `ModuleDesigner.tsx` (no parameter forms, no wiring).
 - **R3.11 The designer's workspace works like the workload canvas:** zoom, pan, controls,
   minimap, snap-to-grid, free node positions (saved in the design's `layout`), delete key; but no
-  handles and no wires. It fills the window (the node preview is hidden by default) and everything
+  handles and no wires. It fills the window (the node preview beside it can be hidden for more room) and everything
   else (refused drops, the selected function, unmet rules) appears under it, growing downward
   without moving it. *Enforced by:* `ModuleDesigner.tsx`, `.designer-workspace` (`index.css`).
+- **R3.12 Input rules are set in the module designer; the choice is made per instance in the
+  workload designer.** For a module with several inputs the author chooses **exactly one input per
+  instance** or **several inputs per instance** (of different types; the default). Each input can
+  **scale out** up to a maximum number of copies per instance (1 = no scaling). In the workload,
+  each instance picks its inputs and copies within those rules (default: the first input for
+  "one", every input once for "several"). Unused inputs have no ports or settings; each copy gets
+  its own ports and settings (`srt1`, `srt1_2`, `srt1_3`…). The published function carries the
+  selection in force (`inputs`).
+  *Enforced by:* `designProblems`, `inputSelectionProblems`, `instanceParts` (`compose.ts`);
+  `withInputs`, `publishProblems` (`workload.ts`); Input rules (`ModuleDesigner.tsx`), Inputs (`Inspector.tsx`).
 - **R3.3 One catalog per vendor.** The vendor name is mandatory and unique; catalog id =
   slug of the vendor name (e.g. "Acme Media" → `acme-media`). A module's vendor is its catalog's.
   *Enforced by:* `catalogProblems` (`src/model/modules.ts`), unique `catalogs.vendor` (`server/db.ts`).
@@ -244,6 +254,8 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-10-20 | Input and output features from the Ateme TITAN Live datasheet: inputs ST 2110, ST 2022-6, NDI, TSoIP, HLS, RTMPS, MXL; Encoder; outputs TSoIP, MBTS, SRT, RIST, ZIXI, RTMPS; packaging HLS, DASH, CMAF, ATSC 3.0 (library 2.2.0). SDI excluded | R7.1, R7.4–R7.6 |
 | 2026-10-20 | The module designer shows functions only: no wiring between blocks (links, chain types and layout removed; library 3.0.0, schema v9). Each port-carrying block has its own feed type. Workspace as large as possible; rule violations etc. appear below it | Supersedes signal chains (R3.1, R3.8); R3.11, R6.1 |
 | 2026-10-20 | The module designer's workspace zooms and pans like the workload canvas (React Flow, positions saved in `design.layout`), still without wires | R3.11 |
+| 2026-10-21 | The module's node preview is shown by default again (can be hidden) | R3.11 |
+| 2026-10-21 | Input rules: the module designer sets one input vs several per instance and a scale-out maximum per input; the workload designer picks each instance's inputs and copies | R3.12 |
 
 ## Open questions
 
@@ -261,3 +273,5 @@ primitives still existed; the parameters now live on features). `media-primitive
   profiles HE/HEv2). Processing features (branding, ad insertion, watermarking, statmux, DRM,
   HDR conversion) aren't modelled yet.
 - Parameters for the new inputs and outputs (addresses, ABR ladders, packaging settings).
+- With scale-out, should the copies of an input share settings (e.g. one SRT mode for all) or
+  stay fully independent (current)?

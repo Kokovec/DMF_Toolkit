@@ -33,7 +33,7 @@ export function PartsEditor({ onMessage }: Props) {
   const [draftCatalog, setDraftCatalog] = useState('')
   const [baseline, setBaseline] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [showPreview, setShowPreview] = useState(false) // hidden by default: more room for the designer
+  const [showPreview, setShowPreview] = useState(true) // can be hidden for more room for the designer
   const [newCatalog, setNewCatalog] = useState<{ vendor: string; name: string } | null>(null)
 
   const reload = useCallback(async () => {

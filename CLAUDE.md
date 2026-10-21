@@ -34,9 +34,9 @@ Detail docs:
 
 ## Code map
 
-- `src/model/types.ts`: all data types (`FeatureDef`, `FeatureLibrary`, `ModuleDesign`/`ModuleBlock`, `VendorModule` (identity, `categories`, `design`, derived ports/parameters), `FunctionInstance` (incl. per-instance `settings`, `control`, `dependencies`, `resources`), `ModuleCatalog`, `PortDef`, `WorkloadDescription`, `FlowDef`, `JsonSchema` with `x-*` extensions; `apiVersion dmf-toolkit/v1alpha3`).
+- `src/model/types.ts`: all data types (`FeatureDef`, `FeatureLibrary`, `ModuleDesign`/`ModuleBlock`, `VendorModule` (identity, `categories`, `design`, derived ports/parameters), `FunctionInstance` (incl. per-instance `inputs`, `settings`, `control`, `dependencies`, `resources`), `ModuleCatalog`, `PortDef`, `WorkloadDescription`, `FlowDef`, `JsonSchema` with `x-*` extensions; `apiVersion dmf-toolkit/v1alpha3`).
 - `src/model/library.json` + `library.ts`: **the feature library**, a versioned file (bump `metadata.version` on every change; the server refuses otherwise). Holds the vocabulary, categories, feature groups and features (blocks, add-ons, module-wide, and options built into blocks via `includes`; parameters with `x-*` keywords incl. `x-flow`; external ports; design rules `attachTo` / `maxPerBlock` / `maxPerModule` / `needsAddon`). `checkLibrary` validates it. There are no primitives.
-- `src/model/compose.ts`: design → module. Rules `canAddFeature`, `canAttach`, `designProblems`; `feedOptions`; `composeModule` (ports and core schema, namespaced by block id); `newBlockId`.
+- `src/model/compose.ts`: design → module. Rules `canAddFeature`, `canAttach`, `designProblems`; `feedOptions`; `composeModule` (ports and core schema, namespaced by block id); `newBlockId`; input rules: `inputBlocks`, `defaultInputs`, `inputSelectionProblems`, `instanceDesign` / `instanceParts` (an instance's ports and schema for its chosen inputs and copies).
 - `src/model/vocabulary.ts`: transports/labels/aliases (`transportOf`), `KNOWN_FORMATS`, External device kinds and reference kinds, all from the library's `vocabulary`.
 - `src/model/modules.ts`:
   - module identity: `vendorSlug`, `nextModuleId` (`<catalog>.<n>`), `catalogProblems`;
@@ -49,7 +49,7 @@ Detail docs:
 - `src/model/schema.ts`: JSON Schema subset: defaults, `validateValue`, `applies` (`x-when`), `titleFor`, `withoutInapplicable`, secret refs.
 - `src/model/workload.ts`:
   - canvas ↔ workload: `toWorkload` / `fromWorkload`;
-  - wiring: `planConnection`, `edgesFor`, `pruneWires`, `rebind`;
+  - wiring: `planConnection`, `edgesFor`, `pruneWires`, `rebind`, `withInputs`; `portsOf` / `schemaOf` (per instance);
   - checks: `checkWorkload`, `publishProblems`, `setupProblems` (per-instance setup);
   - desired state: `flowsOf` (formats from `x-flow` tags, `parseRate`), `toPublished` (adds `libraryVersion`).
 - `src/model/externals.ts`: re-exports External devices from the vocabulary. `src/model/uuid.ts`: UUID v5 for flow ids.
@@ -62,7 +62,7 @@ Detail docs:
   - `SchemaForm.tsx`: forms from schemas; honours `x-when`, `x-group`, `x-title-when`, `x-audience`.
   - `PartsEditor.tsx`: Modules tab (1 identity & categories, 2 design), with live node preview.
   - `FunctionSetup.tsx`: per-instance vendor settings (JSON), control & health, dependencies, resource profile (in the Inspector).
-  - `ModuleDesigner.tsx`: drag-and-drop module design: feature sidebar, zoomable, pannable workspace (React Flow, like the workload canvas) of function nodes with no wires (no wiring), and below it the refused-drop notice, the selected function (feed type, add-ons, settings it adds) and live design rules.
+  - `ModuleDesigner.tsx`: drag-and-drop module design: feature sidebar, zoomable, pannable workspace (React Flow, like the workload canvas) of function nodes with no wires (no wiring), and below it the refused-drop notice, the selected function (feed type, scale-out, add-ons, settings it adds), input rules and live design rules.
   - `WorkloadBrowser.tsx`
 - `src/App.tsx`: wires (`Wire[]`) are the source of truth, edges derived; New / Open / Save / Import / Export / Publish; draft in `localStorage` key `dmf-toolkit:workload:v2`.
 - `src/index.css`: all styles; dark theme only.

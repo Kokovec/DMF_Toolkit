@@ -36,6 +36,7 @@ brief maps to a field:
 | **Placement / constraints**: host/cluster, affinity, on-prem vs cloud, licensing | `functions[].placement` (`site`, `cluster`, `environment`, `with`, `apart`, `licensing`) | Inspector → function → Placement constraints |
 | **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = the instance's control declares NMOS | Inspector → function → Discovery; Flow panel |
 | Domain | `functions[].domain`, `spec.domains[]` | Inspector → function → MXL domain |
+| **Inputs used** (which input functions run, and how many copies) | `functions[].inputs` (input block id → copies; 0 = not used); parameters and ports follow (copies: `srt1`, `srt1_2`, …) | Inspector → function → Inputs |
 | **Vendor settings** (the product's own configuration) | `functions[].settings` (free-form JSON, passed through) | Inspector → function → *vendor* settings |
 | **Control & health** | `functions[].control` (`api`, `nmos`, `health`; health required) | Inspector → function → Control & health |
 | **Dependencies** | `functions[].dependencies[]` (`name`, `kind`, `required`, `role`, `binding`) | Inspector → function → Dependencies |

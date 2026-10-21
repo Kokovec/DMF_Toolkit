@@ -126,7 +126,7 @@ export type VendorModule = {
   product?: string
   productVersion?: string
   capability: { produces: Essence[]; consumes: Essence[]; scaling: Scaling }
-  // 2. Design: blocks, add-ons, chain links, module-wide features
+  // 2. Design: the functions (blocks with add-ons) and module-wide features
   design: ModuleDesign
   // Derived from the design: ports and the core parameter schema (one group per block)
   ports: PortDef[]
@@ -262,20 +262,15 @@ export type WorkloadDescription = {
 
 export type CategoryDef = { id: string; name: string; description: string }
 
-// What travels along a module's internal signal chain between blocks.
-export type ChainType = 'stream' | 'media' // compressed stream | decoded media
-
 // A building block or add-on, with its design rules. Data in the versioned library.
 export type FeatureDef = {
   id: string // e.g. "input.srt", "option.bonding", "decoder", "codec.hevc", "output.mxl", "module.latency"
   name: string
   description: string
   group: string // sidebar group (featureGroups)
-  // block: a node in the module's signal chain; addon: dropped onto a block; module: module-wide;
+  // block: one function of the module; addon: dropped onto a block; module: module-wide;
   // option: built into the blocks that include it, set per instance in the workload designer
   kind: 'block' | 'addon' | 'module' | 'option'
-  input?: ChainType // block: what it takes from the chain (absent = starts a chain)
-  output?: ChainType // block: what it passes on (absent = ends a chain)
   // block facing the outside world: one external port per block, protocol fixed by the feature
   external?: {
     direction: 'in' | 'out'
@@ -284,7 +279,8 @@ export type FeatureDef = {
     dual?: 'always' // two legs .a/.b (e.g. 2022-7)
     dualWhen?: Record<string, (string | number | boolean)[]> // second path per instance (block-relative keys)
   }
-  mxlOutputs?: boolean // block publishes MXL flows (video/audio/ANC per the upstream feed)
+  mxlOutputs?: boolean // block publishes MXL flows (video/audio/ANC for a video feed)
+  mxlInputs?: boolean // block reads MXL flows
   essence?: Essence // codec add-ons: video or audio codec
   includes?: string[] // block: options always part of it (e.g. SRT bonding, network constraints, payload)
   key?: string // parameter group name inside the block (e.g. "srt", "network")
@@ -303,15 +299,15 @@ export type ModuleBlock = {
   id: string // e.g. "srt1"; prefixes the block's ports and parameters
   feature: string
   addons: string[]
-  essence?: Essence // blocks with an external port: video feed or audio-only feed
+  essence?: Essence // blocks with ports: video feed (with its audio/ANC) or audio-only feed
 }
 
-// The module's design: signal-chain blocks, links between them, module-wide features, layout.
+// The module's design: the functions it offers (blocks with their add-ons) and module-wide
+// features. No wiring: how functions are used and configured is up to the workload.
 export type ModuleDesign = {
   blocks: ModuleBlock[]
-  links: { from: string; to: string }[]
   moduleFeatures: string[]
-  layout?: Record<string, { x: number; y: number }>
+  layout?: Record<string, { x: number; y: number }> // workspace positions (block id, or "module:<feature>")
 }
 
 // Shared vocabulary of the library: data, so new protocols, formats or device kinds need no code.
@@ -329,7 +325,6 @@ export type FeatureLibrary = {
   spec: {
     vocabulary: Vocabulary
     categories: CategoryDef[]
-    chainTypes: { id: ChainType; name: string }[]
     featureGroups: { id: string; name: string; description?: string }[]
     features: FeatureDef[]
   }

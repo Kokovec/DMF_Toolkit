@@ -33,6 +33,7 @@ export function PartsEditor({ onMessage }: Props) {
   const [draftCatalog, setDraftCatalog] = useState('')
   const [baseline, setBaseline] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showPreview, setShowPreview] = useState(false) // hidden by default: more room for the designer
   const [newCatalog, setNewCatalog] = useState<{ vendor: string; name: string } | null>(null)
 
   const reload = useCallback(async () => {
@@ -240,8 +241,9 @@ export function PartsEditor({ onMessage }: Props) {
         <div className="part-form empty">
           <p className="hint">
             Select a vendor module to edit it, or create one with <strong>New module</strong>. A module starts blank: drag
-            features (inputs, decoders, codecs, MXL outputs…) onto it and link them into signal chains. Its ports and core
-            parameters follow from the design; you add the vendor's identity and categories. Vendor settings, control & health, dependencies and resources are set per function in the workload designer.
+            the product's functions (inputs, decoders, encoders, outputs…) onto it and drop codecs onto them. Its ports and core
+            parameters follow from the design; you add the vendor's identity and categories. Wiring and configuration are done in
+            the workload designer, and so are vendor settings, control & health, dependencies and resources.
           </p>
         </div>
       ) : (
@@ -318,8 +320,8 @@ export function PartsEditor({ onMessage }: Props) {
             {/* 2. Design */}
             <h3>2 · Design</h3>
             <p className="hint">
-              Drag features from the left onto the module and link them into signal chains (e.g. SRT input → Decoder → MXL output).
-              A multi-function product gets several chains. The module's ports and core parameters follow from the design.
+              A generic description of the product's features: drag its functions onto the workspace and drop codecs onto decoders
+              and encoders. No wiring and no settings here; both are done per instance in the workload designer.
             </p>
             <ModuleDesigner
               design={draft.design}
@@ -375,9 +377,19 @@ export function PartsEditor({ onMessage }: Props) {
         </div>
       )}
 
-      {target && (
+      {target && !showPreview && (
+        <button className="preview-toggle" title="Show the node preview" onClick={() => setShowPreview(true)}>
+          Preview ◂
+        </button>
+      )}
+      {target && showPreview && (
         <aside className="part-preview">
-          <h2>Preview</h2>
+          <h2 className="preview-head">
+            Preview
+            <button className="link" title="Hide the preview for more workspace" onClick={() => setShowPreview(false)}>
+              hide ▸
+            </button>
+          </h2>
           <Preview prim={draft} params={defaults} />
           <p className="hint">
             How instances appear on the canvas with default parameters.

@@ -39,34 +39,37 @@ primitives still existed; the parameters now live on features). `media-primitive
 
 - **R3.1 Modules are designed from features; there are no primitives.** A vendor module starts
   blank and the author drags **features** from the library onto it (Modules tab → Design):
-  - *block*: a stage of a signal chain: inputs (SRT, ZIXI, RIST, 2022-7, RTP, Raw UDP, RTMP),
-    Decoder, MXL output;
-  - *add-on*: dropped onto a block (codecs on a decoder);
+  - *block*: one function of the product: inputs, Decoder, Encoder, outputs (R7);
+  - *add-on*: dropped onto a block (codecs on a decoder or encoder);
   - *option*: built into a block, not placed by the author; its settings are chosen per instance
     in the workload designer (on every input: network constraints and expected payload; on SRT
     inputs also bonding). See R3.10;
   - *module-wide*: applies to the whole module (latency budget).
 
-  Blocks are linked into **signal chains** (e.g. SRT input → Decoder → MXL output). A
-  multi-function product has several chains in one module.
+  A module is a **generic description of a product's features**: the functions it offers, with
+  **no wiring between them**. How the functions are connected and configured is the workload's
+  job. A multi-function product is simply a module with many functions.
 - **R3.2 A module is in one or more categories** (Acquisition, Distribution, …), which decide where
   it appears in the palette. *Enforced by:* `checkModule` (`src/model/catalog.ts`).
-- **R3.8 Design rules live with the features in the library:** a link joins matching chain
-  types (compressed stream → decoder → decoded media → MXL output), one input per block, no
-  loops; `attachTo` (where an add-on may go), `maxPerBlock`, `maxPerModule`, `needsAddon` (e.g.
-  a decoder needs at least one codec). Invalid drops and links are refused with the reason; unmet
-  rules are listed live and block saving.
-  *Enforced by:* `canAddFeature`, `canAttach`, `canLink`, `designProblems` (`src/model/compose.ts`).
+- **R3.8 Design rules live with the features in the library:** `attachTo` (where an add-on may
+  go), `maxPerBlock`, `maxPerModule`, `needsAddon` (e.g. a decoder needs at least one codec).
+  Invalid drops are refused with the reason; unmet rules are listed live and block saving.
+  *Enforced by:* `canAddFeature`, `canAttach`, `designProblems` (`src/model/compose.ts`).
 - **R3.9 Ports and core parameters are derived from the design, never edited.** Each block's
   parameters sit under its block id (`srt1.srt.latencyMs`); its ports are prefixed with it
   (`srt1.in.video`, `mxl1.video`), and each MXL output block is its own time context. The server
   refuses a module whose stored ports or parameters differ from its design.
   *Enforced by:* `composeModule` (`compose.ts`), `withDerived` (`modules.ts`), `checkModule`.
 - **R3.10 The module designer defines structure, not configuration.** It chooses features,
-  add-ons, links and each input's feed type; it never sets parameter values (SRT session, bonding,
+  add-ons and each port-carrying block's feed type (video or audio-only); it never sets parameter values (SRT session, bonding,
   network constraints, payload, formats…). Those are set per instance in the workload designer
   (Inspector). The designer only names the settings each block adds, and its node preview uses
-  default parameters. *Enforced by:* `ModuleDesigner.tsx` (no parameter forms).
+  default parameters. *Enforced by:* `ModuleDesigner.tsx` (no parameter forms, no wiring).
+- **R3.11 The designer's workspace works like the workload canvas:** zoom, pan, controls,
+  minimap, snap-to-grid, free node positions (saved in the design's `layout`), delete key; but no
+  handles and no wires. It fills the window (the node preview is hidden by default) and everything
+  else (refused drops, the selected function, unmet rules) appears under it, growing downward
+  without moving it. *Enforced by:* `ModuleDesigner.tsx`, `.designer-workspace` (`index.css`).
 - **R3.3 One catalog per vendor.** The vendor name is mandatory and unique; catalog id =
   slug of the vendor name (e.g. "Acme Media" → `acme-media`). A module's vendor is its catalog's.
   *Enforced by:* `catalogProblems` (`src/model/modules.ts`), unique `catalogs.vendor` (`server/db.ts`).
@@ -76,7 +79,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R3.6 Three layers: engine in code, vocabulary in the library, instances in the database.**
   - *Engine* (code): what the rule keywords mean, composition, wiring rules, identity, publish
     checks, flow derivation.
-  - *Feature library* (`src/model/library.json`): categories, chain types, feature groups,
+  - *Feature library* (`src/model/library.json`): categories, feature groups,
     features (parameters, ports, design rules) and the shared
     **vocabulary** (protocols with labels/aliases, MXL formats, External device kinds, reference
     kinds). New features, protocols, formats or device kinds need a library change only, no code.
@@ -132,9 +135,9 @@ primitives still existed; the parameters now live on features). `media-primitive
 
 ## 6. Ports, wiring and flows
 
-- **R6.1 Module ports come from its blocks:** an input block gives one external port on its
-  protocol (the author chooses video feed or audio-only feed); an MXL output block gives video,
-  audio and ANC flows for a video feed upstream, audio only for an audio feed.
+- **R6.1 Module ports come from its blocks:** an input or output block gives one external port on
+  its protocol; an MXL input or output block gives video, audio and ANC flows. For each, the
+  author chooses a video feed (with its audio and ANC) or an audio-only feed.
   *Enforced by:* `composeModule`.
 - **R6.2 Flows are mono-essence;** a feed's video, audio and ANC flows share a time context and
   are drawn as one connection (expandable, to split audio from video).
@@ -163,8 +166,9 @@ primitives still existed; the parameters now live on features). `media-primitive
 ## 7. Features defined so far
 
 - **R7.1 Inputs** take one external stream on one protocol each: SRT, ZIXI, RIST, 2022-7, RTP,
-  Raw UDP, RTMP. A product supporting several protocols gets several input blocks (in one module
-  or several).
+  Raw UDP, RTMP, RTMPS, TSoIP, HLS (pull), ST 2110, ST 2022-6, NDI. The **MXL input** reads flows
+  from inside the facility (for output or processing products). A product supporting several
+  protocols gets several input blocks (in one module or several).
 - **R7.2 SRT is fully defined:**
   - **SRT input** session (*function*): mode, latency, encryption, passphrase (if encrypted),
     stream ID, MTU, port and remote address (if caller/rendezvous);
@@ -178,6 +182,13 @@ primitives still existed; the parameters now live on features). `media-primitive
   add-on (H.264, HEVC, JPEG XS, JPEG 2000, AV1, uncompressed; AAC, MPEG-1 Layer II, AC-3, E-AC-3,
   Opus, PCM). **MXL output** publishes decoded media as MXL flows with its format (`x-flow`).
   **Latency budget** is module-wide.
+- **R7.4 Encoder** turns media into a compressed stream and needs at least one codec add-on (the
+  same codec add-ons attach to a decoder or an encoder).
+- **R7.5 Outputs** send the stream on one protocol each: TSoIP, MBTS (multi-bitrate TS), SRT,
+  RIST, ZIXI, RTMPS; **packaging outputs**: HLS, DASH, CMAF, ATSC 3.0. They connect to External
+  Destinations (reference kind *HTTP origin / CDN* for HLS, DASH and CMAF). No parameters yet.
+- **R7.6 The I/O set follows the Ateme TITAN Live datasheet (2026)** as a reference product.
+  Its SDI input is left out (R2.1).
 
 ## 8. Workloads and publishing
 
@@ -189,7 +200,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 ## 9. Storage and deployment of the tool
 
 - **R9.1 One install per customer** (shared by that customer's team): library server + SQLite
-  (`data/`, git-ignored). Schema migrations run automatically (now schema v8; v5 modules are converted to designs).
+  (`data/`, git-ignored). Schema migrations run automatically (now schema v9; v5 modules are converted to designs).
 - **R9.2 Dark theme only.**
 
 ---
@@ -230,13 +241,23 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-10-20 | The module designer doesn't expose configuration (e.g. SRT settings); values are set in the workload designer | Removed the block try-out form; R3.10 |
 | 2026-10-20 | Bonding, network constraints and expected payload are options of the input, chosen per instance in the workload designer, not add-ons placed in the module designer (library 2.1.0, schema v7) | R3.1, R7.2 |
 | 2026-10-20 | Vendor settings, control & health, dependencies and resource profile moved from the module (Modules tab sections 3–6) to each function instance in the workload designer. Vendor settings become free-form JSON (no schema, no core → vendor mapping). Schema v8 copies each module's values onto its instances | Supersedes R4.1, R4.3, R4.5 as of 10-11; R4.3, R4.5, R4.7 |
+| 2026-10-20 | Input and output features from the Ateme TITAN Live datasheet: inputs ST 2110, ST 2022-6, NDI, TSoIP, HLS, RTMPS, MXL; Encoder; outputs TSoIP, MBTS, SRT, RIST, ZIXI, RTMPS; packaging HLS, DASH, CMAF, ATSC 3.0 (library 2.2.0). SDI excluded | R7.1, R7.4–R7.6 |
+| 2026-10-20 | The module designer shows functions only: no wiring between blocks (links, chain types and layout removed; library 3.0.0, schema v9). Each port-carrying block has its own feed type. Workspace as large as possible; rule violations etc. appear below it | Supersedes signal chains (R3.1, R3.8); R3.11, R6.1 |
+| 2026-10-20 | The module designer's workspace zooms and pans like the workload canvas (React Flow, positions saved in `design.layout`), still without wires | R3.11 |
 
 ## Open questions
 
 - 2022-7 inputs: which session parameters (SDP / addresses per leg, codec carried)?
 - Session parameters for ZIXI, RIST, RTP, Raw UDP, RTMP.
 - Should network constraints apply to every protocol, or be defined per protocol like the session?
-- Features still missing: MXL input, encoder and outputs (Distribution), synchronizer (scope:
-  frame-rate conversion? ANC?), processing beyond decoding.
-- Should a module's design be visible to the orchestrator (e.g. to place chains separately), or
-  only its ports and parameters?
+- Features still missing: synchronizer (scope: frame-rate conversion? ANC?), processing beyond
+  decoding and encoding.
+- Should a module's design be visible to the orchestrator, or only its ports and parameters?
+- Without wiring inside a module, the orchestrator can't tell which input feeds which output of a
+  multi-function product. Is that needed (e.g. declared per instance in the workload)?
+- TSoIP overlaps with the RTP and Raw UDP inputs (all carry MPEG-TS over IP). Keep all three, or
+  make TSoIP the one block with UDP/RTP as an instance option?
+- Datasheet codecs not in the library yet: VVC, SHVC, MPEG-2, AC-4, MPEG-H, DD+ JOC (and AAC
+  profiles HE/HEv2). Processing features (branding, ad insertion, watermarking, statmux, DRM,
+  HDR conversion) aren't modelled yet.
+- Parameters for the new inputs and outputs (addresses, ABR ladders, packaging settings).

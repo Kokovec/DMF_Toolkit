@@ -63,7 +63,6 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
     cats.add(c.id)
   }
   const groups = new Set(lib.spec.featureGroups.map((g) => g.id))
-  const chainTypes = new Set<string>(lib.spec.chainTypes.map((c) => c.id))
 
   // Features
   const ids = new Set<string>()
@@ -73,8 +72,7 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
     ids.add(f.id)
     if (!groups.has(f.group)) errors.push(`${at}: unknown group ${f.group}`)
     if (!['block', 'addon', 'module', 'option'].includes(f.kind)) errors.push(`${at}: kind must be block, addon, module or option`)
-    for (const t of [f.input, f.output]) if (t && !chainTypes.has(t)) errors.push(`${at}: unknown chain type ${t}`)
-    if (f.kind !== 'block' && (f.input || f.output || f.external || f.mxlOutputs)) errors.push(`${at}: only blocks have chain types or ports`)
+    if (f.kind !== 'block' && (f.external || f.mxlOutputs || f.mxlInputs)) errors.push(`${at}: only blocks have ports`)
     if (f.external) {
       if (!transports.includes(f.external.protocol)) errors.push(`${at}: unknown protocol ${f.external.protocol}`)
       if (!f.external.essenceOptions?.length || f.external.essenceOptions.some((e) => !ESSENCES.includes(e)))

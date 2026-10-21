@@ -1,15 +1,14 @@
 // Module design → ports + parameter schema, and the design rules. Used live by the module
 // designer (drop checks, rule list) and by the server on save, so a module's derived parts can
 // never drift from its design.
-import { getFeature, LIBRARY, matchesFeature } from './library'
+import { getFeature, matchesFeature } from './library'
 import { KNOWN_FORMATS, TRANSPORT_LABELS } from './vocabulary'
 import type { Essence, FeatureDef, JsonSchema, ModuleBlock, ModuleDesign, PortDef } from './types'
 
 export const BLOCK_ID_RE = /^[a-z][a-z0-9-]*$/ // no dots: block ids prefix port and parameter paths
 
-export const EMPTY_DESIGN: ModuleDesign = { blocks: [], links: [], moduleFeatures: [] }
+export const EMPTY_DESIGN: ModuleDesign = { blocks: [], moduleFeatures: [] }
 
-const chainName = (id: string) => LIBRARY.spec.chainTypes.find((c) => c.id === id)?.name.toLowerCase() ?? id
 const label = (b: ModuleBlock) => `${getFeature(b.feature)?.name ?? b.feature} (${b.id})`
 
 // A fresh block id from the feature, e.g. "input.srt" -> "srt1", "output.mxl" -> "mxl1".
@@ -21,19 +20,15 @@ export function newBlockId(design: ModuleDesign, featureId: string): string {
   return `${base}${sep}${n}`
 }
 
-// The feed type reaching a block: the essence chosen on the input block upstream of it.
-export function upstreamEssence(design: ModuleDesign, blockId: string, seen = new Set<string>()): Essence | undefined {
-  if (seen.has(blockId)) return undefined
-  seen.add(blockId)
-  const b = design.blocks.find((x) => x.id === blockId)
-  const f = b && getFeature(b.feature)
-  if (b && f?.external?.direction === 'in') return b.essence ?? f.external.essenceOptions[0]
-  for (const l of design.links.filter((x) => x.to === blockId)) {
-    const e = upstreamEssence(design, l.from, seen)
-    if (e) return e
-  }
+// Feed types the author can choose on a block with ports: a video feed (with its audio and ANC)
+// or an audio-only feed. Blocks without ports have none.
+export function feedOptions(f: FeatureDef): Essence[] | undefined {
+  if (f.external) return f.external.essenceOptions
+  if (f.mxlInputs || f.mxlOutputs) return ['video', 'audio']
   return undefined
 }
+
+const feedOf = (b: ModuleBlock, f: FeatureDef): Essence => b.essence ?? feedOptions(f)?.[0] ?? 'video'
 
 // ---- Drop-time rules (the designer refuses invalid drops with the reason) ----
 
@@ -54,25 +49,6 @@ export function canAttach(design: ModuleDesign, addon: FeatureDef, blockId: stri
   }
   const count = b.addons.filter((a) => a === addon.id).length
   if (count >= (addon.rules?.maxPerBlock ?? Infinity)) return `${label(b)} already has ${addon.name}`
-  return null
-}
-
-export function canLink(design: ModuleDesign, from: string, to: string): string | null {
-  if (from === to) return 'a block cannot feed itself'
-  const a = design.blocks.find((b) => b.id === from)
-  const b = design.blocks.find((x) => x.id === to)
-  const fa = a && getFeature(a.feature)
-  const fb = b && getFeature(b.feature)
-  if (!a || !b || !fa || !fb) return 'unknown block'
-  if (!fa.output) return `${label(a)} doesn't pass anything on`
-  if (!fb.input) return `${label(b)} doesn't take an input`
-  if (fa.output !== fb.input) return `${label(a)} gives a ${chainName(fa.output)}; ${label(b)} needs a ${chainName(fb.input)}`
-  if (design.links.some((l) => l.from === from && l.to === to)) return 'already linked'
-  if (design.links.some((l) => l.to === to)) return `${label(b)} already has an input`
-  // no cycles: `to` must not reach `from`
-  const reaches = (x: string, target: string, seen = new Set<string>()): boolean =>
-    x === target || (!seen.has(x) && (seen.add(x), design.links.filter((l) => l.from === x).some((l) => reaches(l.to, target, seen))))
-  if (reaches(to, from)) return 'that would make a loop'
   return null
 }
 
@@ -111,13 +87,13 @@ function blockSchema(b: ModuleBlock): JsonSchema | undefined {
   return prefixConditions({ type: 'object', title: `${f.name} · ${b.id}`, properties: groups }, b.id)
 }
 
-function blockPorts(design: ModuleDesign, b: ModuleBlock): PortDef[] {
+function blockPorts(b: ModuleBlock): PortDef[] {
   const f = getFeature(b.feature)
   if (!f) return []
   const ports: PortDef[] = []
   if (f.external) {
-    const essence = b.essence ?? f.external.essenceOptions[0]
     const dir = f.external.direction
+    const essence = feedOf(b, f)
     const base: PortDef = {
       id: `${b.id}.${dir}.${essence}`,
       direction: dir,
@@ -135,8 +111,22 @@ function blockPorts(design: ModuleDesign, b: ModuleBlock): PortDef[] {
       ports.push(base)
     }
   }
+  if (f.mxlInputs) {
+    const essence = feedOf(b, f)
+    const flows: Essence[] = essence === 'video' ? ['video', 'audio', 'data'] : [essence]
+    for (const e of flows)
+      ports.push({
+        id: `${b.id}.${e === 'data' ? 'anc' : e}`,
+        direction: 'in',
+        essence: e,
+        cardinality: e === essence ? '1' : '0..1', // the feed's main flow is required
+        formats: KNOWN_FORMATS[e].slice(0, 1),
+        timeContext: b.id,
+        transport: 'mxl',
+      })
+  }
   if (f.mxlOutputs) {
-    const essence = upstreamEssence(design, b.id) ?? 'video'
+    const essence = feedOf(b, f)
     const flows: Essence[] = essence === 'video' ? ['video', 'audio', 'data'] : [essence]
     for (const e of flows)
       ports.push({
@@ -163,15 +153,15 @@ export function composeModule(design: ModuleDesign): { ports: PortDef[]; schema:
     const f = getFeature(id)
     if (f?.parameters && f.key) properties[f.key] = structuredClone(f.parameters.schema)
   }
-  return { ports: design.blocks.flatMap((b) => blockPorts(design, b)), schema: { type: 'object', properties } }
+  return { ports: design.blocks.flatMap(blockPorts), schema: { type: 'object', properties } }
 }
 
 // ---- Whole-design rules (listed until fixed; saving is blocked while any remain) ----
 
 export function designProblems(design: ModuleDesign): string[] {
   const errors: string[] = []
-  if (!design || !Array.isArray(design.blocks) || !Array.isArray(design.links) || !Array.isArray(design.moduleFeatures))
-    return ['design must have blocks, links and moduleFeatures']
+  if (!design || !Array.isArray(design.blocks) || !Array.isArray(design.moduleFeatures))
+    return ['design must have blocks and moduleFeatures']
   if (!design.blocks.length) errors.push('Drag a feature onto the module to start (e.g. an input)')
   const ids = new Set<string>()
   for (const b of design.blocks) {
@@ -182,7 +172,7 @@ export function designProblems(design: ModuleDesign): string[] {
       errors.push(`${b.id}: "${b.feature}" is not a block feature`)
       continue
     }
-    if (b.essence && !f.external?.essenceOptions.includes(b.essence)) errors.push(`${label(b)}: feed type ${b.essence} not offered`)
+    if (b.essence && !feedOptions(f)?.includes(b.essence)) errors.push(`${label(b)}: feed type ${b.essence} not offered`)
     // add-ons
     const seen: string[] = []
     for (const a of b.addons) {
@@ -197,9 +187,6 @@ export function designProblems(design: ModuleDesign): string[] {
     }
     for (const n of f.rules?.needsAddon ?? [])
       if (b.addons.filter((a) => getFeature(a)?.group === n.group).length < n.min) errors.push(`${label(b)}: ${n.message}`)
-    // chain
-    if (f.input && !design.links.some((l) => l.to === b.id)) errors.push(`${label(b)} needs a ${chainName(f.input)} from another block`)
-    if (f.output && !design.links.some((l) => l.from === b.id)) errors.push(`${label(b)} isn't connected to anything`)
   }
   for (const id of new Set([...design.blocks.map((b) => b.feature), ...design.moduleFeatures])) {
     const f = getFeature(id)
@@ -207,11 +194,6 @@ export function designProblems(design: ModuleDesign): string[] {
     if (f?.rules?.maxPerModule !== undefined && used > f.rules.maxPerModule) errors.push(`${f.name}: at most ${f.rules.maxPerModule} per module`)
   }
   for (const m of design.moduleFeatures) if (getFeature(m)?.kind !== 'module') errors.push(`"${m}" is not a module-wide feature`)
-  // links (checked against the design without that link)
-  design.links.forEach((l, i) => {
-    const why = canLink({ ...design, links: design.links.filter((_, j) => j !== i) }, l.from, l.to)
-    if (why) errors.push(`link ${l.from} → ${l.to}: ${why}`)
-  })
   if (design.blocks.length && !composeModule(design).ports.length) errors.push('The module has no inputs or outputs yet')
   return errors
 }

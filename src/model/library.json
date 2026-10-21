@@ -2,7 +2,7 @@
   "apiVersion": "dmf-toolkit/v1alpha3",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "2.1.0",
+    "version": "3.0.0",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -61,6 +61,50 @@
         {
           "id": "tams",
           "label": "TAMS"
+        },
+        {
+          "id": "st2022-6",
+          "label": "ST 2022-6"
+        },
+        {
+          "id": "tsoip",
+          "label": "TSoIP",
+          "aliases": [
+            "ts-over-ip"
+          ]
+        },
+        {
+          "id": "hls",
+          "label": "HLS"
+        },
+        {
+          "id": "rtmps",
+          "label": "RTMPS"
+        },
+        {
+          "id": "mbts",
+          "label": "MBTS",
+          "aliases": [
+            "multi-bitrate-ts"
+          ]
+        },
+        {
+          "id": "dash",
+          "label": "DASH",
+          "aliases": [
+            "mpeg-dash"
+          ]
+        },
+        {
+          "id": "cmaf",
+          "label": "CMAF"
+        },
+        {
+          "id": "atsc3",
+          "label": "ATSC 3.0",
+          "aliases": [
+            "atsc-3.0"
+          ]
         }
       ],
       "formats": {
@@ -114,7 +158,7 @@
         },
         {
           "id": "sdp",
-          "label": "SDP / address (RTP, Raw UDP, 2022-7)",
+          "label": "SDP / address (RTP, Raw UDP, TSoIP, MBTS, ATSC 3.0, 2022-6, 2022-7, 2110)",
           "source": "SDP name or URL",
           "destination": "SDP name or URL"
         },
@@ -132,7 +176,7 @@
         },
         {
           "id": "rtmp",
-          "label": "RTMP stream",
+          "label": "RTMP(S) stream",
           "source": "app/stream name pushed to us, e.g. live/venue1",
           "destination": "RTMP URL or app/stream, e.g. live/cdn-a"
         },
@@ -141,6 +185,12 @@
           "label": "NDI",
           "source": "NDI source name",
           "destination": "NDI receiver name"
+        },
+        {
+          "id": "http",
+          "label": "HTTP origin / CDN (HLS, DASH, CMAF)",
+          "source": "playlist or manifest URL, e.g. https://origin.example/live/ch1.m3u8",
+          "destination": "origin or CDN ingest point, e.g. cdn-origin-a"
         }
       ]
     },
@@ -154,16 +204,6 @@
         "id": "distribution",
         "name": "Distribution",
         "description": "Getting media out of the facility to its audiences and partners: encoding for delivery and onward transport."
-      }
-    ],
-    "chainTypes": [
-      {
-        "id": "stream",
-        "name": "Compressed stream"
-      },
-      {
-        "id": "media",
-        "name": "Decoded media"
       }
     ],
     "featureGroups": [
@@ -189,6 +229,10 @@
         "name": "Outputs"
       },
       {
+        "id": "packaging",
+        "name": "Packaging outputs"
+      },
+      {
         "id": "module",
         "name": "Module-wide"
       }
@@ -200,7 +244,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external SRT stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "srt",
@@ -336,7 +379,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external ZIXI stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "zixi",
@@ -356,7 +398,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external RIST stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "rist",
@@ -376,7 +417,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external 2022-7 stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "st2022-7",
@@ -397,7 +437,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external RTP stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "rtp",
@@ -417,7 +456,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external Raw UDP stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "udp",
@@ -437,7 +475,6 @@
         "group": "inputs",
         "kind": "block",
         "description": "Receives one external RTMP stream (a video feed with its audio/ANC, or an audio-only feed).",
-        "output": "stream",
         "external": {
           "direction": "in",
           "protocol": "rtmp",
@@ -450,6 +487,128 @@
           "option.network",
           "option.payload"
         ]
+      },
+      {
+        "id": "input.st2110",
+        "name": "ST 2110 input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one SMPTE ST 2110 essence group (a video feed with its audio/ANC, or an audio-only feed). Uncompressed (or lightly compressed) media, so no decoder is needed.",
+        "external": {
+          "direction": "in",
+          "protocol": "st2110",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.st2022-6",
+        "name": "ST 2022-6 input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one SMPTE ST 2022-6 stream (SDI over IP, uncompressed) (a video feed with its audio/ANC, or an audio-only feed). No decoder is needed.",
+        "external": {
+          "direction": "in",
+          "protocol": "st2022-6",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.ndi",
+        "name": "NDI input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one NDI source (a video feed with its audio/ANC, or an audio-only feed), delivered as media.",
+        "external": {
+          "direction": "in",
+          "protocol": "ndi",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.tsoip",
+        "name": "TSoIP input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one MPEG transport stream over IP (UDP or RTP) (a video feed with its audio/ANC, or an audio-only feed).",
+        "external": {
+          "direction": "in",
+          "protocol": "tsoip",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.hls",
+        "name": "HLS input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Pulls one HLS stream from an origin (a video feed with its audio/ANC, or an audio-only feed).",
+        "external": {
+          "direction": "in",
+          "protocol": "hls",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.rtmps",
+        "name": "RTMPS input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Receives one RTMP-over-TLS stream (a video feed with its audio/ANC, or an audio-only feed).",
+        "external": {
+          "direction": "in",
+          "protocol": "rtmps",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "option.network",
+          "option.payload"
+        ]
+      },
+      {
+        "id": "input.mxl",
+        "name": "MXL input",
+        "group": "inputs",
+        "kind": "block",
+        "description": "Reads media from MXL flows inside the facility (video, audio and ANC for a video feed; audio only for an audio feed). Starts the chain of an output or processing module.",
+        "mxlInputs": true
       },
       {
         "id": "option.bonding",
@@ -745,8 +904,6 @@
         "kind": "block",
         "key": "decoder",
         "description": "Decodes the incoming stream into media. Attach the codecs this product can decode.",
-        "input": "stream",
-        "output": "media",
         "parameters": {
           "schema": {
             "type": "object",
@@ -780,13 +937,28 @@
         }
       },
       {
+        "id": "encoder",
+        "name": "Encoder",
+        "group": "processing",
+        "kind": "block",
+        "description": "Encodes media into a compressed stream for delivery. Attach the codecs this product can encode.",
+        "rules": {
+          "needsAddon": [
+            {
+              "group": "codecs",
+              "min": 1,
+              "message": "An encoder needs at least one codec"
+            }
+          ]
+        }
+      },
+      {
         "id": "output.mxl",
         "name": "MXL output",
         "group": "outputs",
         "kind": "block",
         "key": "format",
         "description": "Publishes decoded media as MXL flows (video, audio and ANC for a video feed; audio only for an audio feed), normalized to the output format below.",
-        "input": "media",
         "mxlOutputs": true,
         "parameters": {
           "schema": {
@@ -879,6 +1051,156 @@
         }
       },
       {
+        "id": "output.tsoip",
+        "name": "TSoIP output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Sends the stream as an MPEG transport stream over IP (UDP or RTP).",
+        "external": {
+          "direction": "out",
+          "protocol": "tsoip",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.mbts",
+        "name": "MBTS output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Sends a multi-bitrate transport stream (the renditions of an ABR ladder in one TS).",
+        "external": {
+          "direction": "out",
+          "protocol": "mbts",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.srt",
+        "name": "SRT output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Sends the stream over SRT.",
+        "external": {
+          "direction": "out",
+          "protocol": "srt",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.rist",
+        "name": "RIST output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Sends the stream over RIST.",
+        "external": {
+          "direction": "out",
+          "protocol": "rist",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.zixi",
+        "name": "ZIXI output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Sends the stream over ZIXI.",
+        "external": {
+          "direction": "out",
+          "protocol": "zixi",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.rtmps",
+        "name": "RTMPS output",
+        "group": "outputs",
+        "kind": "block",
+        "description": "Pushes the stream over RTMP with TLS (e.g. to a streaming platform).",
+        "external": {
+          "direction": "out",
+          "protocol": "rtmps",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.hls",
+        "name": "HLS output",
+        "group": "packaging",
+        "kind": "block",
+        "description": "Packages the stream as HLS for an origin or CDN.",
+        "external": {
+          "direction": "out",
+          "protocol": "hls",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.dash",
+        "name": "DASH output",
+        "group": "packaging",
+        "kind": "block",
+        "description": "Packages the stream as MPEG-DASH for an origin or CDN.",
+        "external": {
+          "direction": "out",
+          "protocol": "dash",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.cmaf",
+        "name": "CMAF output",
+        "group": "packaging",
+        "kind": "block",
+        "description": "Packages the stream as CMAF (shared HLS/DASH segments) for an origin or CDN.",
+        "external": {
+          "direction": "out",
+          "protocol": "cmaf",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "output.atsc3",
+        "name": "ATSC 3.0 output",
+        "group": "packaging",
+        "kind": "block",
+        "description": "Packages the stream for ATSC 3.0 broadcast (ROUTE/DASH or MMT).",
+        "external": {
+          "direction": "out",
+          "protocol": "atsc3",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
         "id": "module.latency",
         "name": "Latency budget",
         "group": "module",
@@ -912,10 +1234,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "H.264 (video) codec support.",
+        "description": "H.264 (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -926,10 +1249,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "HEVC (video) codec support.",
+        "description": "HEVC (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -940,10 +1264,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "JPEG XS (video) codec support.",
+        "description": "JPEG XS (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -954,10 +1279,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "JPEG 2000 (video) codec support.",
+        "description": "JPEG 2000 (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -968,10 +1294,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "AV1 (video) codec support.",
+        "description": "AV1 (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -982,10 +1309,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "video",
-        "description": "Uncompressed (video) codec support.",
+        "description": "Uncompressed (video) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -996,10 +1324,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "AAC (audio) codec support.",
+        "description": "AAC (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1010,10 +1339,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "MPEG-1 Layer II (audio) codec support.",
+        "description": "MPEG-1 Layer II (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1024,10 +1354,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "AC-3 (audio) codec support.",
+        "description": "AC-3 (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1038,10 +1369,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "E-AC-3 (audio) codec support.",
+        "description": "E-AC-3 (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1052,10 +1384,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "Opus (audio) codec support.",
+        "description": "Opus (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1066,10 +1399,11 @@
         "group": "codecs",
         "kind": "addon",
         "essence": "audio",
-        "description": "PCM (audio) codec support.",
+        "description": "PCM (audio) codec support (decode or encode, on the block it is attached to).",
         "rules": {
           "attachTo": [
-            "decoder"
+            "decoder",
+            "encoder"
           ],
           "maxPerBlock": 1
         }

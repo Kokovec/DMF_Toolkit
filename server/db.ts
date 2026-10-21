@@ -6,13 +6,14 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { Catalog } from '../src/model/catalog'
 import { catalogProblems } from '../src/model/modules'
-import { LIBRARY } from '../src/model/library'
+import { getFeature, LIBRARY } from '../src/model/library'
+import { feedOptions } from '../src/model/compose'
 import { withDerived } from '../src/model/modules'
 import { getPath } from '../src/model/schema'
-import { API_VERSION, type ModuleCatalog, type FeatureLibrary, type ControlSpec, type Dependency, type JsonValue, type ModuleDesign, type ResourceProfile, type VendorModule, type WorkloadDescription } from '../src/model/types'
+import { API_VERSION, type ModuleCatalog, type FeatureLibrary, type ControlSpec, type Dependency, type JsonValue, type ModuleBlock, type ModuleDesign, type ResourceProfile, type VendorModule, type WorkloadDescription } from '../src/model/types'
 
 // Bump when the schema or the stored document shapes change incompatibly.
-const SCHEMA_VERSION = 8
+const SCHEMA_VERSION = 9
 
 const SCHEMA = `
 -- Every feature library version this install has run with (the file lives in git).
@@ -106,6 +107,7 @@ export class Store {
       if (version <= 5) this.migrateFrom5()
       if (version <= 6) this.migrateFrom6()
       if (version <= 7) this.migrateFrom7()
+      if (version <= 8) this.migrateFrom8()
     }
     this.db.exec(SCHEMA)
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
@@ -183,6 +185,39 @@ export class Store {
       for (const r of mods) {
         const { vendorSettings: _v, control: _c, dependencies: _d, resources: _r, ...m } = legacy.get(`${r.id}@${r.version}`)!
         this.db.prepare('UPDATE modules SET document = ? WHERE id = ? AND version = ?').run(JSON.stringify(m), r.id, r.version)
+      }
+    })
+  }
+
+  // v8 -> v9: designs have no links any more (a module lists its functions; wiring is
+  // the workload's job). Blocks with ports now carry their own feed type: MXL outputs and external
+  // outputs keep the feed that reached them through the old links.
+  private migrateFrom8() {
+    this.tx(() => {
+      const rows = this.db.prepare('SELECT id, version, document FROM modules').all() as { id: string; version: string; document: string }[]
+      for (const r of rows) {
+        const m = JSON.parse(r.document) as VendorModule
+        const old = m.design as ModuleDesign & { links?: { from: string; to: string }[]; layout?: unknown }
+        if (!old) continue
+        const links = old.links ?? []
+        const feed = (id: string, seen = new Set<string>()): ModuleBlock['essence'] => {
+          if (seen.has(id)) return undefined
+          seen.add(id)
+          const b = old.blocks.find((x) => x.id === id)
+          if (b?.essence) return b.essence
+          for (const l of links.filter((x) => x.to === id)) {
+            const e = feed(l.from, seen)
+            if (e) return e
+          }
+          return undefined
+        }
+        const blocks = old.blocks.map((b) => {
+          const f = getFeature(b.feature)
+          const e = f && feedOptions(f) ? (b.essence ?? feed(b.id)) : undefined
+          return e ? { ...b, essence: e } : b
+        })
+        const design: ModuleDesign = { blocks, moduleFeatures: old.moduleFeatures ?? [], ...(old.layout ? { layout: old.layout as ModuleDesign['layout'] } : {}) }
+        this.db.prepare('UPDATE modules SET document = ? WHERE id = ? AND version = ?').run(JSON.stringify(withDerived({ ...m, design })), r.id, r.version)
       }
     })
   }
@@ -456,11 +491,7 @@ function convertReceiver(old: LegacyModule, id: string): LegacyModule {
     blocks: [
       { id: input, feature: `input.${protocol}`, addons: [], essence: ext?.essence },
       { id: 'decoder1', feature: 'decoder', addons: ['codec.h264', 'codec.hevc', 'codec.aac'] },
-      { id: 'mxl1', feature: 'output.mxl', addons: [] },
-    ],
-    links: [
-      { from: input, to: 'decoder1' },
-      { from: 'decoder1', to: 'mxl1' },
+      { id: 'mxl1', feature: 'output.mxl', addons: [], essence: ext?.essence },
     ],
     moduleFeatures: ['module.latency'],
   }

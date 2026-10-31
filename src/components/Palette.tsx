@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { api, describeError, refreshCatalog, useCatalog, type CatalogSummary } from '../api'
 import { checkCatalog, isEdge } from '../model/catalog'
 import { EXTERNALS, EXTERNAL_KINDS } from '../model/externals'
-import { LIBRARY } from '../model/library'
-import type { ModuleCatalog } from '../model/types'
+import { getCategory } from '../model/library'
+import type { ModuleCatalog, VendorModule } from '../model/types'
+
+// Categories are kept as descriptive tags (shown in the tooltip), not as palette headings.
+const categoryNames = (m: VendorModule) => m.categories.map((c) => getCategory(c)?.name ?? c).join(', ')
 
 export const DRAG_MIME = 'application/x-dmf-node' // "fn:<module type id>" or "ext:<external kind>"
 
@@ -44,20 +47,20 @@ export function Palette({ online, onMessage }: Props) {
 
   return (
     <aside className="palette">
-      {LIBRARY.spec.categories.map((category) => (
-        <section key={category.id} className="palette-category">
-          <h2 title={category.description}>{category.name}</h2>
-          {catalog.forCategory(category.id).length === 0 && <p className="hint">No vendor modules yet.</p>}
-          {catalog.forCategory(category.id).map((p) => (
+      {/* One heading per company; its products below. Double-click a placed function to configure it. */}
+      {catalog.byCompany().length === 0 && <p className="hint">No products yet.</p>}
+      {catalog.byCompany().map(({ company, modules }) => (
+        <section key={company} className="palette-category">
+          <h2>{company}</h2>
+          {modules.map((p) => (
             <div
               key={p.id}
               className={`palette-item fn${isEdge(p) ? ' edge' : ''}`}
               draggable
-              title={`${p.description}\n${p.id}@${p.version}`}
+              title={`${p.description}\n${categoryNames(p)} · ${p.id}@${p.version}`}
               onDragStart={drag(`fn:${p.id}`)}
             >
               {p.name}
-              <span className="hint"> {p.vendor}</span>
             </div>
           ))}
         </section>

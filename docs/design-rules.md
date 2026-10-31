@@ -37,55 +37,58 @@ primitives still existed; the parameters now live on features). `media-primitive
 
 ## 3. Hierarchy and identity
 
-- **R3.1 Modules are designed from features; there are no primitives.** A vendor module starts
-  blank and the author drags **features** from the library onto it (Modules tab → Design):
-  - *block*: one function of the product: inputs, Decoder, Encoder, outputs (R7);
-  - *add-on*: dropped onto a block (codecs on a decoder or encoder);
-  - *option*: built into a block, not placed by the author; its settings are chosen per instance
-    in the workload designer (on every input: network constraints and expected payload; on SRT
-    inputs also bonding). See R3.10;
+- **R3.1 Every module models a real product; there is no module designer.** A product's module
+  is defined in its company's catalog file (`catalogs/<company>.catalog.json`, built by
+  `scripts/product-catalogs.ts`), which the server loads at every start (a catalog that can't be
+  loaded is reported and skipped); other catalogs can be imported from the Palette. Its design lists the product's
+  functions as library **features**:
+  - *block*: one function of the product: inputs, decoder, encoder, outputs, internal features (R7);
+  - *add-on*: attached to a block (codecs on a decoder or encoder; speech-to-text on captions);
+  - *option*: built into a block (per-source setup, audio channel, key; network constraints,
+    expected payload, SRT bonding);
   - *module-wide*: applies to the whole module (latency budget).
 
-  A module is a **generic description of a product's features**: the functions it offers, with
-  **no wiring between them**. How the functions are connected and configured is the workload's
-  job. A multi-function product is simply a module with many functions.
-- **R3.2 A module is in one or more categories** (Acquisition, Distribution, …), which decide where
-  it appears in the palette. *Enforced by:* `checkModule` (`src/model/catalog.ts`).
+  There is **no wiring between a module's functions**; how the functions are used and
+  configured is set per instance in the workload (R8.4).
+- **R3.2 The palette is organised by company:** one heading per company (the catalog's vendor),
+  with its products (modules) under it, starting with Switchframe → Switchframe. A module's
+  categories (Acquisition, Distribution, Production…) remain descriptive tags (tooltip), not palette
+  headings. *Enforced by:* `Catalog.byCompany` (`catalog.ts`), `Palette.tsx`; categories: `checkModule`.
 - **R3.8 Design rules live with the features in the library:** `attachTo` (where an add-on may
   go), `maxPerBlock`, `maxPerModule`, `needsAddon` (e.g. a decoder needs at least one codec).
-  Invalid drops are refused with the reason; unmet rules are listed live and block saving.
-  *Enforced by:* `canAddFeature`, `canAttach`, `designProblems` (`src/model/compose.ts`).
+  A product module that breaks them is refused on import.
+  *Enforced by:* `canAttach`, `designProblems` (`src/model/compose.ts`), `checkCatalog`.
 - **R3.9 Ports and core parameters are derived from the design, never edited.** Each block's
   parameters sit under its block id (`srt1.srt.latencyMs`); its ports are prefixed with it
   (`srt1.in.video`, `mxl1.video`), and each MXL output block is its own time context. The server
   refuses a module whose stored ports or parameters differ from its design.
   *Enforced by:* `composeModule` (`compose.ts`), `withDerived` (`modules.ts`), `checkModule`.
-- **R3.10 The module designer defines structure, not configuration.** It chooses features,
-  add-ons and each port-carrying block's feed type (video or audio-only); it never sets parameter values (SRT session, bonding,
-  network constraints, payload, formats…). Those are set per instance in the workload designer
-  (Inspector). The designer only names the settings each block adds, and its node preview uses
-  default parameters. *Enforced by:* `ModuleDesigner.tsx` (no parameter forms, no wiring).
-- **R3.11 The designer's workspace works like the workload canvas:** zoom, pan, controls,
-  minimap, snap-to-grid, free node positions (saved in the design's `layout`), delete key; but no
-  handles and no wires. It fills the window (the node preview beside it can be hidden for more room) and everything
-  else (refused drops, the selected function, unmet rules) appears under it, growing downward
-  without moving it. *Enforced by:* `ModuleDesigner.tsx`, `.designer-workspace` (`index.css`).
-- **R3.12 Input rules are set in the module designer; the choice is made per instance in the
-  workload designer.** For a module with several inputs the author chooses **exactly one input per
-  instance** or **several inputs per instance** (of different types; the default). Each input can
-  **scale out** up to a maximum number of copies per instance (1 = no scaling). In the workload,
-  each instance picks its inputs and copies within those rules (default: the first input for
-  "one", every input once for "several"). Unused inputs have no ports or settings; each copy gets
-  its own ports and settings (`srt1`, `srt1_2`, `srt1_3`…). The published function carries the
-  selection in force (`inputs`).
+- **R3.12 Input rules come with the product; each instance chooses within them.** A product with
+  several inputs uses **exactly one input per instance** or **several inputs per instance** (of
+  different types; the default), and each input can **scale out** up to a maximum number of copies
+  per instance (1 = no scaling). In the workload, each instance picks its inputs and how many of
+  each (default: the first input for "one", every input once for "several"). Unused inputs have no
+  ports or settings; each copy gets its own ports and settings (`srt1`, `srt1_2`, `srt1_3`…). The
+  published function carries the selection in force (`inputs`). Outputs: R3.15.
   *Enforced by:* `designProblems`, `inputSelectionProblems`, `instanceParts` (`compose.ts`);
-  `withInputs`, `publishProblems` (`workload.ts`); Input rules (`ModuleDesigner.tsx`), Inputs (`Inspector.tsx`).
+  `withSelection`, `publishProblems` (`workload.ts`); Inputs tab (`FunctionDialog.tsx`).
+- **R3.13 The feature library is organised in sections, each with groups:** *Common* (inputs, processing, codecs, outputs, packaging, module-wide) and
+  *Production switcher* (switcher inputs, source options, outputs, features, add-ons).
+  Module categories (tags): Acquisition, Distribution, Production.
+  *Enforced by:* `checkLibrary` (`library.ts`).
+- **R3.14 A feature can require another function in the module** (`rules.requires`: any of these
+  feature ids), e.g. SRT/RTMP program outputs and recording need a program encoder; SCTE-104 needs
+  an MXL source or MXL program output. *Enforced by:* `designProblems` (`compose.ts`).
+- **R3.15 Outputs scale out too.** An output block has a scale-out maximum like an input. Each
+  instance runs every output once by default and can turn an output off (0) or run several copies
+  (e.g. several SRT destinations), each with its own ports and settings. The published function
+  carries `outputs`. Functions without ports (e.g. recording) aren't counted.
+  *Enforced by:* `outputSelectionProblems`, `instanceParts` (`compose.ts`); Outputs tab (`FunctionDialog.tsx`).
 - **R3.3 One catalog per vendor.** The vendor name is mandatory and unique; catalog id =
   slug of the vendor name (e.g. "Acme Media" → `acme-media`). A module's vendor is its catalog's.
   *Enforced by:* `catalogProblems` (`src/model/modules.ts`), unique `catalogs.vendor` (`server/db.ts`).
-- **R3.4 Type id = `<catalog>.<number>`**, numbered automatically with the next free number in
-  the vendor's catalog (e.g. `acme-media.2`). *Duplicate* gets a new
-  number; *New version* keeps it. *Enforced by:* `nextModuleId`, `catalogProblems`.
+- **R3.4 Type id = `<catalog>.<number>`** (e.g. `switchframe.1`), set in the product catalog. A new
+  release of the product's module keeps its number with a new version. *Enforced by:* `catalogProblems`.
 - **R3.6 Three layers: engine in code, vocabulary in the library, instances in the database.**
   - *Engine* (code): what the rule keywords mean, composition, wiring rules, identity, publish
     checks, flow derivation.
@@ -111,7 +114,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R4.2 No placement or infrastructure on the module:** no image, licences, locality, edge
   interfaces or node constraints. Edge functions are inferred from external ports (`isEdge`).
 - **R4.3 Each function instance carries its own setup**, set in the workload designer
-  (Inspector): vendor settings, control & health endpoints, dependencies (each bound to a facility
+  (function dialog, Setup tab): vendor settings, control & health endpoints, dependencies (each bound to a facility
   resource) and the resource profile. A health check is required, and so is a binding for every
   required dependency. *Enforced by:* `setupProblems` (`workload.ts`), `FunctionSetup.tsx`.
 - **R4.4 Core parameters** are the features' common vocabulary: minimal, understood by the
@@ -199,6 +202,20 @@ primitives still existed; the parameters now live on features). `media-primitive
   Destinations (reference kind *HTTP origin / CDN* for HLS, DASH and CMAF). No parameters yet.
 - **R7.6 The I/O set follows the Ateme TITAN Live datasheet (2026)** as a reference product.
   Its SDI input is left out (R2.1).
+- **R7.7 Production switcher features follow the open-source Switchframe switcher** (2026): inputs
+  SRT (listener / caller), MoQ, MXL, ST 2110; outputs SRT (caller / listener), RTMP, MXL,
+  ST 2110, recording; features switching engine (programme format and timing), program encoder,
+  captions (+ AI speech-to-text), SCTE-35 (+ SCTE-104), replay, clip players, playout, control room,
+  and the live-operated ones (transitions, audio mixer, keyers & DVE, graphics, colour grading,
+  ST map, AI background removal, comms). Only real deploy-time settings are parameters;
+  live-operated features have none. Ports, TLS, state/cache paths, DPDK, GPU builds and
+  active-active pairs are the orchestrator's. Mapping to the product: `products/switchframe.md`;
+  example module: `catalogs/switchframe.catalog.json`.
+  Per source (every switcher input): label, multiview position, alignment delay; audio channel
+  (trim, audio-follow-video, delay, high-pass, gate, 3-band EQ, compressor); upstream key
+  (chroma / luma / neural). Feature settings come from Switchframe's flags and from the API calls
+  that are configuration (format, captions mode, speech-to-text, master limiter, SCTE-35 default
+  rule, replay shutter angle, destinations, recording); run-time calls are excluded.
 
 ## 8. Workloads and publishing
 
@@ -206,6 +223,22 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R8.2 Publishing = a saved revision that passes every check,** served at
   `GET /api/workloads/:id/published`. *Enforced by:* `publishProblems`, `server/app.ts`.
 - **R8.3 The workload description is the workflow intent** published to the orchestrator.
+- **R8.4 A function is configured in a pop-up dialog, opened by double-clicking its node** (or
+  *Configure…* in the Inspector). Header tabs:
+  - **General** (name, MXL domain);
+  - **Inputs**: how many of each input type (within the product's input rules), then each copy's
+    settings, chosen from a list;
+  - **one tab per configurable feature** of the product (e.g. Switching engine, Program encoder,
+    Captions);
+  - **Outputs** (like Inputs);
+  - **Setup** (vendor settings, control & health, dependencies, resources);
+  - **Intent** (expectations, placement, discovery).
+
+  A feature with several parameter groups shows them as sub-tabs (e.g. an SRT source: SRT
+  source, Source, Audio channel, Upstream key, Network constraints, Expected payload). Tabs with
+  unmet settings are marked; wiring problems stay on the canvas. Only **configuration** is exposed,
+  never production run-time controls (cuts, faders, cues, playback). The Inspector shows a summary.
+  *Enforced by:* `FunctionDialog.tsx`, `onNodeDoubleClick` (`App.tsx`).
 
 ## 9. Storage and deployment of the tool
 
@@ -256,6 +289,9 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-10-20 | The module designer's workspace zooms and pans like the workload canvas (React Flow, positions saved in `design.layout`), still without wires | R3.11 |
 | 2026-10-21 | The module's node preview is shown by default again (can be hidden) | R3.11 |
 | 2026-10-21 | Input rules: the module designer sets one input vs several per instance and a scale-out maximum per input; the workload designer picks each instance's inputs and copies | R3.12 |
+| 2026-10-31 | Production switcher modelled on Switchframe: library sections (Common, Production switcher with inputs / outputs / features / add-ons; library 3.1.0), palette category Production, `requires` design rule, output scale-out and per-instance output selection; example catalog and product mapping for the future Docker/Terraform compile | R3.13–R3.15, R7.7 |
+| 2026-10-31 | No module designer: every module models a real product, defined in a catalog file (`scripts/product-catalogs.ts`) and imported; Modules tab removed. Functions are configured in a pop-up dialog (double-click) with a tab per feature, Inputs/Outputs tabs for how many of each and each copy's settings, and Setup/Intent tabs. Switchframe gets per-source setup, audio channel and key options and its other configuration API settings (library 3.2.1) | Supersedes R3.10, R3.11 and the module designer of R3.1; R3.1, R3.12, R8.4, R7.7 |
+| 2026-10-31 | Palette headings are company names, not categories (now tags); the first company and product are Switchframe → Switchframe. Product catalogs live in `catalogs/` and load at server start | R3.1, R3.2 |
 
 ## Open questions
 
@@ -275,3 +311,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 - Parameters for the new inputs and outputs (addresses, ABR ladders, packaging settings).
 - With scale-out, should the copies of an input share settings (e.g. one SRT mode for all) or
   stay fully independent (current)?
+- Format presets: express valid resolution × rate combinations as a design rule (today only the
+  compiler can refuse e.g. 2160p24 for Switchframe)?
+- Example catalogs are regenerated from their designs after a library change. Should the server
+  recompute stored modules' derived ports/parameters when the library version changes?

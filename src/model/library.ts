@@ -62,6 +62,13 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
     if (!ID_RE.test(c.id) || cats.has(c.id)) errors.push(`category ${c.id}: id must be unique and valid`)
     cats.add(c.id)
   }
+  const sections = new Set<string>()
+  for (const x of lib.spec.featureSections ?? []) {
+    if (!ID_RE.test(x.id) || sections.has(x.id)) errors.push(`feature section ${x.id}: id must be unique and valid`)
+    sections.add(x.id)
+  }
+  if (!sections.size) errors.push('spec.featureSections is required')
+  for (const g of lib.spec.featureGroups) if (!sections.has(g.section)) errors.push(`feature group ${g.id}: unknown section ${g.section}`)
   const groups = new Set(lib.spec.featureGroups.map((g) => g.id))
 
   // Features
@@ -103,6 +110,10 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
     for (const pattern of f.rules?.attachTo ?? [])
       if (!lib.spec.features.some((g) => g.kind === 'block' && matchesFeature(pattern, g.id)))
         errors.push(`feature ${f.id}: attachTo "${pattern}" matches no block feature`)
+    for (const r of f.rules?.requires ?? [])
+      for (const pattern of r.anyOf ?? [])
+        if (!lib.spec.features.some((g) => g.kind === 'block' && matchesFeature(pattern, g.id)))
+          errors.push(`feature ${f.id}: requires "${pattern}" matches no block feature`)
     for (const n of f.rules?.needsAddon ?? []) if (!groups.has(n.group)) errors.push(`feature ${f.id}: needsAddon names unknown group ${n.group}`)
     for (const id of f.includes ?? [])
       if (f.kind !== 'block' || lib.spec.features.find((g) => g.id === id)?.kind !== 'option')

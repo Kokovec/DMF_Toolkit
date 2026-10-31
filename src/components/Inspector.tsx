@@ -1,23 +1,9 @@
 import { useCatalog } from '../api'
 import { EXTERNALS, REFERENCE_KINDS } from '../model/externals'
-import { inputBlocks, inputsOf, inputSelectionProblems } from '../model/compose'
-import { getCategory, getFeature } from '../model/library'
+import { getCategory } from '../model/library'
 import { leafPaths } from '../model/schema'
-import type {
-  Colorspace,
-  Expectations,
-  ExternalRefKind,
-  ExternalReference,
-  FlowDef,
-  FlowOptions,
-  InputSelection,
-  PlacementConstraints,
-  VendorModule,
-  WorkloadDefaults,
-} from '../model/types'
-import { DEFAULT_HISTORY_MS, moduleOf, rebind, schemaOf, withInputs, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
-import { FunctionSetup } from './FunctionSetup'
-import { SchemaForm } from './SchemaForm'
+import type { Colorspace, ExternalRefKind, ExternalReference, FlowDef, FlowOptions, VendorModule, WorkloadDefaults } from '../model/types'
+import { DEFAULT_HISTORY_MS, moduleOf, rebind, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
 
 type Props = {
   selected: CanvasNode[]
@@ -28,6 +14,7 @@ type Props = {
   problems: string[]
   onNodeChange: (id: string, data: FnData | ExtData) => void
   onDelete: (id: string) => void
+  onConfigure: (id: string) => void // open the function's configuration dialog
   flows: FlowDef[] // flows of the selected wire(s), when a wire is selected
   nodes: CanvasNode[]
 }
@@ -162,7 +149,7 @@ function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefau
 
 // ---- Function instance ----
 
-function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id: string; data: FnData }) {
+function FunctionPanel({ id, data, onNodeChange, onDelete, onConfigure, problems }: Props & { id: string; data: FnData }) {
   const catalog = useCatalog()
   const prim = moduleOf(data, catalog)
   const update = (patch: Partial<FnData>) => onNodeChange(id, { ...data, ...patch })
@@ -181,6 +168,7 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
     )
 
   const latest = catalog.get(prim.id)
+  const mine = problems.filter((p) => p.startsWith(`${id}: `)).map((p) => p.slice(id.length + 2))
   const headings = prim.categories.map((c) => getCategory(c)?.name ?? c).join(', ')
 
   return (
@@ -205,25 +193,17 @@ function FunctionPanel({ id, data, nodes, onNodeChange, onDelete }: Props & { id
       </label>
       {latest && latest.version !== prim.version && <UpgradeOffer from={prim} to={latest} onUpgrade={() => onNodeChange(id, rebind(data, latest))} />}
 
-      <label className="field">
-        <span>MXL domain</span>
-        <input value={data.domain} placeholder="main" onChange={(e) => update({ domain: e.target.value })} />
-        <span className="hint">Logical isolation group for this function's flows; the orchestrator creates and places it.</span>
-      </label>
-
-      <InputChoice data={data} prim={prim} onChange={(inputs) => onNodeChange(id, withInputs(data, prim, inputs))} />
-
-      <h3>Core parameters</h3>
-      <SchemaForm
-        key={`${id}:${prim.id}@${prim.version}:${JSON.stringify(data.inputs ?? null)}`}
-        schema={schemaOf(prim, data)}
-        value={data.parameters}
-        onChange={(parameters) => update({ parameters })}
-      />
-
-      <FunctionSetup key={id} data={data} vendor={prim.vendor} update={update} />
-
-      <Intent data={data} prim={prim} others={nodes.filter((n) => n.data.kind === 'fn' && n.id !== id).map((n) => n.id)} update={update} />
+      <button className="primary configure" onClick={() => onConfigure(id)}>
+        Configure…
+      </button>
+      <p className="hint">Or double-click the node. Inputs, outputs and each feature's settings are in tabs.</p>
+      {mine.length > 0 && (
+        <ul className="problems compact">
+          {mine.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      )}
 
       <Contract prim={prim} data={data} />
 
@@ -352,53 +332,6 @@ function ReferenceFields({ data, onChange }: { data: ExtData; onChange: (r: Exte
   )
 }
 
-// Which of the module's inputs this instance uses, and how many copies of each (scale-out), within
-// the module's input rules. Only shown when there is a choice to make.
-function InputChoice({ data, prim, onChange }: { data: FnData; prim: VendorModule; onChange: (inputs: InputSelection) => void }) {
-  const inputs = inputBlocks(prim.design)
-  if (inputs.length < 2 && !inputs.some((b) => (b.scaleOut ?? 1) > 1)) return null
-  const one = prim.design.inputRule === 'one'
-  const sel = inputsOf(prim.design, data.inputs)
-  const problems = inputSelectionProblems(prim.design, data.inputs)
-  const set = (id: string, n: number) => onChange({ ...sel, [id]: n })
-  const pick = (id: string) => onChange(Object.fromEntries(inputs.map((b) => [b.id, b.id === id ? Math.max(1, sel[id] ?? 0) : 0])))
-  return (
-    <>
-      <h3>Inputs</h3>
-      <p className="hint">
-        {one ? 'This module uses exactly one of its inputs per instance.' : 'This module can use several of its inputs per instance.'}
-        {inputs.some((b) => (b.scaleOut ?? 1) > 1) && ' Some inputs scale out: set how many of each.'}
-      </p>
-      {inputs.map((b) => {
-        const name = getFeature(b.feature)?.name ?? b.feature
-        const n = sel[b.id] ?? 0
-        const max = b.scaleOut ?? 1
-        return (
-          <div key={b.id} className="input-choice">
-            <label className="field-check">
-              <input
-                type={one ? 'radio' : 'checkbox'}
-                name={`inputs-${prim.id}`}
-                checked={n > 0}
-                onChange={(e) => (one ? pick(b.id) : set(b.id, e.target.checked ? 1 : 0))}
-              />{' '}
-              {name} <span className="hint">{b.id}</span>
-            </label>
-            {max > 1 && n > 0 && (
-              <label className="input-count">
-                ×
-                <input type="number" min={1} max={max} value={n} onChange={(e) => set(b.id, Math.min(max, Math.max(1, e.target.valueAsNumber || 1)))} />
-                <span className="hint">of {max}</span>
-              </label>
-            )}
-          </div>
-        )
-      })}
-      {problems.length > 0 && <p className="error-text">{problems.join('; ')}</p>}
-    </>
-  )
-}
-
 // What a newer version of the module changes, shown before upgrading an instance.
 function UpgradeOffer({ from, to, onUpgrade }: { from: VendorModule; to: VendorModule; onUpgrade: () => void }) {
   const before = new Set(leafPaths(from.parameters.schema))
@@ -417,97 +350,6 @@ function UpgradeOffer({ from, to, onUpgrade }: { from: VendorModule; to: VendorM
         </p>
       )}
     </div>
-  )
-}
-
-// ---- Desired-state metadata for one function: expectations, placement constraints, discovery ----
-
-function Intent({ data, prim, others, update }: { data: FnData; prim: VendorModule; others: string[]; update: (p: Partial<FnData>) => void }) {
-  const ex = data.expectations ?? {}
-  const pl = data.placement ?? {}
-  const disc = data.discovery ?? { register: !!data.control?.nmos }
-  const setEx = (patch: Partial<Expectations>) => update({ expectations: clean({ ...ex, ...patch }) })
-  const setPl = (patch: Partial<PlacementConstraints>) => update({ placement: clean({ ...pl, ...patch }) })
-  const ids = (v: string) => {
-    const list = v.split(',').map((x) => x.trim()).filter(Boolean)
-    return list.length ? list : undefined
-  }
-  return (
-    <>
-      <h3>Expectations</h3>
-      <div className="field-row">
-        <label className="field">
-          <span>Resilience</span>
-          <select value={ex.resilience ?? 'none'} onChange={(e) => setEx({ resilience: e.target.value === 'none' ? undefined : (e.target.value as Expectations['resilience']) })}>
-            <option value="none">none</option>
-            <option value="1+1">1+1</option>
-            <option value="n+1">N+1</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Scaling</span>
-          <select
-            value={ex.scaling ?? 'fixed'}
-            disabled={prim.capability.scaling === 'singleton'}
-            onChange={(e) => setEx({ scaling: e.target.value === 'fixed' ? undefined : 'elastic' })}
-          >
-            <option value="fixed">fixed</option>
-            <option value="elastic">elastic</option>
-          </select>
-        </label>
-      </div>
-
-      <h3>Placement constraints</h3>
-      <div className="field-row">
-        <label className="field">
-          <span>Site</span>
-          <input value={pl.site ?? ''} placeholder="any" onChange={(e) => setPl({ site: e.target.value || undefined })} />
-        </label>
-        <label className="field">
-          <span>Cluster</span>
-          <input value={pl.cluster ?? ''} placeholder="any" onChange={(e) => setPl({ cluster: e.target.value || undefined })} />
-        </label>
-      </div>
-      <label className="field">
-        <span>Environment</span>
-        <select value={pl.environment ?? 'any'} onChange={(e) => setPl({ environment: e.target.value === 'any' ? undefined : (e.target.value as PlacementConstraints['environment']) })}>
-          <option value="any">any</option>
-          <option value="on-prem">on-prem</option>
-          <option value="cloud">cloud</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>Run with (affinity)</span>
-        <input list="instance-ids" value={(pl.with ?? []).join(', ')} placeholder="instance ids" onChange={(e) => setPl({ with: ids(e.target.value) })} />
-      </label>
-      <label className="field">
-        <span>Keep apart from</span>
-        <input list="instance-ids" value={(pl.apart ?? []).join(', ')} placeholder="instance ids" onChange={(e) => setPl({ apart: ids(e.target.value) })} />
-      </label>
-      <datalist id="instance-ids">
-        {others.map((o) => (
-          <option key={o} value={o} />
-        ))}
-      </datalist>
-      <label className="field">
-        <span>Licensing constraint</span>
-        <input value={pl.licensing ?? ''} placeholder="e.g. site licence pool A" onChange={(e) => setPl({ licensing: e.target.value || undefined })} />
-      </label>
-
-      <h3>Discovery</h3>
-      <label className="field field-check">
-        <input type="checkbox" checked={disc.register} onChange={(e) => update({ discovery: { ...disc, register: e.target.checked } })} />
-        <span>Register for discovery (NMOS)</span>
-      </label>
-      <label className="field">
-        <span>Labels / tags</span>
-        <input
-          value={(disc.labels ?? []).join(', ')}
-          placeholder="e.g. studio-a, news"
-          onChange={(e) => update({ discovery: clean({ ...disc, labels: ids(e.target.value) }) as FnData['discovery'] })}
-        />
-      </label>
-    </>
   )
 }
 

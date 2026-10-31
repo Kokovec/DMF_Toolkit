@@ -32,6 +32,7 @@ import {
   nextNodeId,
   planConnection,
   publishProblems,
+  moduleOf,
   pruneWires,
   splitRef,
   toWorkload,
@@ -44,7 +45,7 @@ import {
 import { ExternalNode, FunctionNode } from './components/MediaNode'
 import { DRAG_MIME, Palette } from './components/Palette'
 import { Inspector } from './components/Inspector'
-import { PartsEditor } from './components/PartsEditor'
+import { FunctionDialog } from './components/FunctionDialog'
 import { WorkloadBrowser } from './components/WorkloadBrowser'
 
 const nodeTypes = { fn: FunctionNode, ext: ExternalNode }
@@ -92,7 +93,7 @@ function Editor() {
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null)
   const [online, setOnline] = useState(false)
   const [browsing, setBrowsing] = useState(false)
-  const [view, setView] = useState<'canvas' | 'parts'>('canvas')
+  const [configuring, setConfiguring] = useState<string | null>(null) // function node whose dialog is open
   const { screenToFlowPosition, getNode, fitView } = useReactFlow<CanvasNode, WireEdge>()
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -320,54 +321,38 @@ function Editor() {
     }
   }
 
+  const configuringNode = nodes.find((n) => n.id === configuring)
+  const configuringModule = configuringNode?.data.kind === 'fn' ? moduleOf(configuringNode.data, catalog) : undefined
+
   return (
     <div className="app">
       <header className="topbar">
         <h1>DMF Toolkit</h1>
-        <nav className="tabs">
-          <button className={view === 'canvas' ? 'active' : ''} onClick={() => setView('canvas')}>
-            Workload
-          </button>
-          <button
-            className={view === 'parts' ? 'active' : ''}
-            onClick={() => setView('parts')}
-            disabled={!online}
-            title={online ? 'Edit the vendor module library' : 'Needs the library server'}
-          >
-            Modules
-          </button>
-        </nav>
-        {view === 'canvas' && (
-          <span className="workload-name">
-            {metadata.name} · {savedHere ? `rev ${savedHere.revision}${dirty ? ' (modified)' : ''}` : 'not saved'}
-          </span>
-        )}
+        <span className="workload-name">
+          {metadata.name} · {savedHere ? `rev ${savedHere.revision}${dirty ? ' (modified)' : ''}` : 'not saved'}
+        </span>
         <span className="spacer" />
         <span className={`status ${online ? 'online' : 'offline'}`} title={online ? 'Library server connected' : 'Library server not reachable'}>
           {online ? 'Library connected' : 'Offline'}
         </span>
-        {view === 'canvas' && (
-          <>
-            <button onClick={clear}>New</button>
-            <button onClick={() => setBrowsing(true)} disabled={!online}>
-              Open…
-            </button>
-            <button onClick={save} disabled={!online || !dirty}>
-              Save
-            </button>
-            <button onClick={() => fileInput.current?.click()}>Import</button>
-            <button onClick={() => download(`${metadata.id || 'workload'}.workload.json`, workload)}>Export</button>
-            <button
-              className="primary"
-              onClick={publish}
-              disabled={!online || problems.length > 0}
-              title={problems.length ? `${problems.length} issue(s): see Publish readiness (click empty canvas)` : 'Save and publish to the orchestrator'}
-            >
-              Publish{problems.length ? ` (${problems.length})` : ''}
-            </button>
-            <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importJson} />
-          </>
-        )}
+        <button onClick={clear}>New</button>
+        <button onClick={() => setBrowsing(true)} disabled={!online}>
+          Open…
+        </button>
+        <button onClick={save} disabled={!online || !dirty}>
+          Save
+        </button>
+        <button onClick={() => fileInput.current?.click()}>Import</button>
+        <button onClick={() => download(`${metadata.id || 'workload'}.workload.json`, workload)}>Export</button>
+        <button
+          className="primary"
+          onClick={publish}
+          disabled={!online || problems.length > 0}
+          title={problems.length ? `${problems.length} issue(s): see Publish readiness (click empty canvas)` : 'Save and publish to the orchestrator'}
+        >
+          Publish{problems.length ? ` (${problems.length})` : ''}
+        </button>
+        <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importJson} />
       </header>
       {message && (
         <div className={message.isError ? 'error-bar' : 'info-bar'} role={message.isError ? 'alert' : 'status'}>
@@ -376,49 +361,60 @@ function Editor() {
         </div>
       )}
       {browsing && <WorkloadBrowser onOpen={open} onClose={() => setBrowsing(false)} />}
-      {view === 'parts' ? (
-        <PartsEditor onMessage={showMessage} />
-      ) : (
-        <div className="workspace">
-          <Palette online={online} onMessage={showMessage} />
-          <div className="canvas" onDragOver={onDragOver} onDrop={onDrop}>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              onNodesChange={handleNodesChange}
-              onEdgesChange={handleEdgesChange}
-              onConnect={onConnect}
-              onConnectEnd={onConnectEnd}
-              isValidConnection={isValidConnection}
-              deleteKeyCode={['Backspace', 'Delete']}
-              minZoom={0.1}
-              maxZoom={4}
-              snapToGrid
-              snapGrid={[16, 16]}
-              fitView
-              colorMode="dark"
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-              <Controls />
-              <MiniMap pannable zoomable />
-            </ReactFlow>
-          </div>
-          <Inspector
-            selected={nodes.filter((n) => n.selected)}
-            metadata={metadata}
-            onMetadataChange={setMetadata}
-            defaults={defaults}
-            onDefaultsChange={setDefaults}
-            problems={problems}
-            onNodeChange={updateNode}
-            onDelete={deleteNode}
-            flows={selectedFlows}
+      <div className="workspace">
+        <Palette online={online} onMessage={showMessage} />
+        <div className="canvas" onDragOver={onDragOver} onDrop={onDrop}>
+          <ReactFlow
             nodes={nodes}
-          />
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onConnect={onConnect}
+            onConnectEnd={onConnectEnd}
+            isValidConnection={isValidConnection}
+            onNodeDoubleClick={(_e, n) => n.data.kind === 'fn' && setConfiguring(n.id)}
+            zoomOnDoubleClick={false}
+            deleteKeyCode={['Backspace', 'Delete']}
+            minZoom={0.1}
+            maxZoom={4}
+            snapToGrid
+            snapGrid={[16, 16]}
+            fitView
+            colorMode="dark"
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+            <Controls />
+            <MiniMap pannable zoomable />
+          </ReactFlow>
         </div>
-      )}
+        <Inspector
+          selected={nodes.filter((n) => n.selected)}
+          metadata={metadata}
+          onMetadataChange={setMetadata}
+          defaults={defaults}
+          onDefaultsChange={setDefaults}
+          problems={problems}
+          onNodeChange={updateNode}
+          onDelete={deleteNode}
+          onConfigure={setConfiguring}
+          flows={selectedFlows}
+          nodes={nodes}
+        />
+        {configuringNode?.data.kind === 'fn' && configuringModule && (
+          <FunctionDialog
+            id={configuringNode.id}
+            data={configuringNode.data}
+            prim={configuringModule}
+            others={nodes.filter((n) => n.data.kind === 'fn' && n.id !== configuringNode.id).map((n) => n.id)}
+            problems={problems}
+            onChange={(data) => updateNode(configuringNode.id, data)}
+            onClose={() => setConfiguring(null)}
+          />
+        )}
+      </div>
+
     </div>
   )
 }

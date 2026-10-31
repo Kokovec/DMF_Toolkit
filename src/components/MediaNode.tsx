@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Handle, Position, useEdges, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { useCatalog } from '../api'
-import { isEdge, isRequired, resolvePorts, transportLabel, type ResolvedPort } from '../model/catalog'
+import { isEdge, isRequired, transportLabel, type ResolvedPort } from '../model/catalog'
 import { EXTERNALS } from '../model/externals'
-import { instanceParts } from '../model/compose'
-import { getCategory } from '../model/library'
-import { defaultsFor } from '../model/schema'
-import type { JsonValue, VendorModule } from '../model/types'
+import type { VendorModule } from '../model/types'
 import { BUNDLE, portsOf, moduleOf, type ExtNode, type FnNode } from '../model/workload'
 
 export function FunctionNode({ id, data, selected }: NodeProps<FnNode>) {
@@ -34,19 +31,6 @@ export function ExternalNode({ id, data, selected }: NodeProps<ExtNode>) {
   const t = EXTERNALS[data.extKind]
   return (
     <NodeView id={id} className="ext" title={data.name} subtitle={`${t?.name ?? data.extKind} · external`} ports={portsOf(data)} selected={selected} />
-  )
-}
-
-// A module as a new instance would appear on the canvas: default inputs and parameters (parts editor preview).
-export function ModulePreview({ id, prim, params }: { id: string; prim: VendorModule; params?: { [k: string]: JsonValue } }) {
-  return (
-    <NodeView
-      id={id}
-      className={nodeClass(prim)}
-      title={prim.name || 'Unnamed'}
-      subtitle={`${prim.categories.map((c) => getCategory(c)?.name ?? c).join(', ') || 'no category'} · ${prim.vendor || 'vendor?'}`}
-      ports={resolvePorts(instanceParts(prim).ports, params ?? defaultsFor(instanceParts(prim).schema))}
-    />
   )
 }
 

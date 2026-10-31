@@ -2,7 +2,7 @@
   "apiVersion": "dmf-toolkit/v1alpha3",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "3.0.0",
+    "version": "3.2.1",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -105,6 +105,14 @@
           "aliases": [
             "atsc-3.0"
           ]
+        },
+        {
+          "id": "moq",
+          "label": "MoQ",
+          "aliases": [
+            "media-over-quic",
+            "webtransport"
+          ]
         }
       ],
       "formats": {
@@ -191,6 +199,12 @@
           "label": "HTTP origin / CDN (HLS, DASH, CMAF)",
           "source": "playlist or manifest URL, e.g. https://origin.example/live/ch1.m3u8",
           "destination": "origin or CDN ingest point, e.g. cdn-origin-a"
+        },
+        {
+          "id": "moq",
+          "label": "MoQ stream",
+          "source": "stream name the source publishes under, e.g. cam-1",
+          "destination": "stream name, e.g. program"
         }
       ]
     },
@@ -204,37 +218,87 @@
         "id": "distribution",
         "name": "Distribution",
         "description": "Getting media out of the facility to its audiences and partners: encoding for delivery and onward transport."
+      },
+      {
+        "id": "production",
+        "name": "Production",
+        "description": "Making the programme: production switching, audio mixing, graphics, replay and playout."
+      }
+    ],
+    "featureSections": [
+      {
+        "id": "common",
+        "name": "Common",
+        "description": "Building blocks shared by every kind of module."
+      },
+      {
+        "id": "production-switcher",
+        "name": "Production switcher",
+        "description": "The functions of a live production switcher: its inputs, its program outputs, and the internal features that need configuring."
       }
     ],
     "featureGroups": [
       {
         "id": "inputs",
-        "name": "Inputs"
+        "name": "Inputs",
+        "section": "common"
       },
       {
         "id": "options",
         "name": "Input options",
-        "description": "Built into input blocks; set per instance in the workload designer."
+        "description": "Built into input blocks; set per instance in the workload designer.",
+        "section": "common"
       },
       {
         "id": "processing",
-        "name": "Processing"
+        "name": "Processing",
+        "section": "common"
       },
       {
         "id": "codecs",
-        "name": "Codecs"
+        "name": "Codecs",
+        "section": "common"
       },
       {
         "id": "outputs",
-        "name": "Outputs"
+        "name": "Outputs",
+        "section": "common"
       },
       {
         "id": "packaging",
-        "name": "Packaging outputs"
+        "name": "Packaging outputs",
+        "section": "common"
       },
       {
         "id": "module",
-        "name": "Module-wide"
+        "name": "Module-wide",
+        "section": "common"
+      },
+      {
+        "id": "switcher-inputs",
+        "name": "Switcher inputs",
+        "section": "production-switcher"
+      },
+      {
+        "id": "switcher-outputs",
+        "name": "Switcher outputs",
+        "section": "production-switcher"
+      },
+      {
+        "id": "switcher-options",
+        "name": "Switcher source options",
+        "section": "production-switcher",
+        "description": "Built into every switcher input; set per source."
+      },
+      {
+        "id": "switcher-features",
+        "name": "Switcher features",
+        "section": "production-switcher"
+      },
+      {
+        "id": "switcher-addons",
+        "name": "Switcher add-ons",
+        "section": "production-switcher"
       }
     ],
     "features": [
@@ -1238,7 +1302,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1253,7 +1318,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1268,7 +1334,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1283,7 +1350,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1298,7 +1366,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1313,7 +1382,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1328,7 +1398,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1343,7 +1414,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1358,7 +1430,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1373,7 +1446,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1388,7 +1462,8 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
         }
@@ -1403,9 +1478,1611 @@
         "rules": {
           "attachTo": [
             "decoder",
-            "encoder"
+            "encoder",
+            "switcher.encoder"
           ],
           "maxPerBlock": 1
+        }
+      },
+      {
+        "id": "switcher.input.srt",
+        "name": "SRT source",
+        "group": "switcher-inputs",
+        "kind": "block",
+        "description": "A camera, encoder or remote switcher arriving over SRT. Listener: it pushes to the switcher's SRT listener and is told apart by its stream ID. Caller: the switcher pulls from its address. Any codec FFmpeg decodes; decoded continuously so cuts are instant.",
+        "external": {
+          "direction": "in",
+          "protocol": "srt",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "switcher.option.source",
+          "switcher.option.audio",
+          "switcher.option.key",
+          "option.network",
+          "option.payload"
+        ],
+        "key": "srt",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "SRT source",
+            "x-audience": "function",
+            "required": [
+              "mode",
+              "address",
+              "latencyMs"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "listener",
+                  "caller"
+                ],
+                "default": "listener",
+                "description": "Listener: the source pushes to us. Caller: we pull from the source."
+              },
+              "address": {
+                "type": "string",
+                "title": "Source address",
+                "description": "host:port of the source to pull from.",
+                "x-when": {
+                  "mode": [
+                    "caller"
+                  ]
+                }
+              },
+              "streamId": {
+                "type": "string",
+                "title": "Stream ID",
+                "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller)."
+              },
+              "latencyMs": {
+                "type": "integer",
+                "title": "Latency (ms)",
+                "minimum": 20,
+                "maximum": 8000,
+                "default": 120
+              },
+              "inputBandwidthMbps": {
+                "type": "number",
+                "title": "Input bandwidth (Mbit/s)",
+                "description": "0 = estimate automatically.",
+                "minimum": 0,
+                "default": 0
+              },
+              "overheadPercent": {
+                "type": "integer",
+                "title": "Recovery overhead (%)",
+                "description": "Bandwidth kept for retransmission.",
+                "minimum": 5,
+                "maximum": 100,
+                "default": 25
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.input.moq",
+        "name": "MoQ source",
+        "group": "switcher-inputs",
+        "kind": "block",
+        "description": "An H.264 source published to the switcher over Media over QUIC (WebTransport), e.g. from a browser or a Prism ingest.",
+        "external": {
+          "direction": "in",
+          "protocol": "moq",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "switcher.option.source",
+          "switcher.option.audio",
+          "switcher.option.key",
+          "option.network",
+          "option.payload"
+        ],
+        "key": "moq",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "MoQ source",
+            "x-audience": "function",
+            "required": [
+              "streamName"
+            ],
+            "properties": {
+              "streamName": {
+                "type": "string",
+                "title": "Stream name",
+                "description": "Name the source publishes under."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.input.mxl",
+        "name": "MXL source",
+        "group": "switcher-inputs",
+        "kind": "block",
+        "description": "Uncompressed media from another function in the facility over MXL shared memory (V210 video, float32 audio, optional data flow with SCTE-104). Skips decoding entirely. The flows come from the workload wiring.",
+        "mxlInputs": true,
+        "includes": [
+          "switcher.option.source",
+          "switcher.option.audio",
+          "switcher.option.key"
+        ]
+      },
+      {
+        "id": "switcher.input.st2110",
+        "name": "ST 2110 receiver",
+        "group": "switcher-inputs",
+        "kind": "block",
+        "description": "An SMPTE ST 2110 essence group (-20 video, -30 audio, -40 ANC), connected through NMOS IS-04/IS-05 and timed by PTP. The orchestrator assigns the network interface, PTP and NMOS connections.",
+        "external": {
+          "direction": "in",
+          "protocol": "st2110",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "includes": [
+          "switcher.option.source",
+          "switcher.option.audio",
+          "switcher.option.key",
+          "option.network"
+        ]
+      },
+      {
+        "id": "switcher.option.source",
+        "name": "Source setup",
+        "group": "switcher-options",
+        "kind": "option",
+        "key": "source",
+        "description": "Per-source setup: label, multiview position, alignment delay.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Source",
+            "x-audience": "function",
+            "properties": {
+              "label": {
+                "type": "string",
+                "title": "Label",
+                "description": "Shown on the multiview (max 64 characters)."
+              },
+              "position": {
+                "type": "integer",
+                "title": "Multiview position",
+                "minimum": 1,
+                "maximum": 64,
+                "description": "Order on the multiview; empty = in the order sources are added."
+              },
+              "delayMs": {
+                "type": "integer",
+                "title": "Alignment delay (ms)",
+                "minimum": 0,
+                "maximum": 500,
+                "default": 0,
+                "description": "Delays this source's video and audio to line it up with the others."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.option.audio",
+        "name": "Audio channel",
+        "group": "switcher-options",
+        "kind": "option",
+        "key": "audio",
+        "description": "The source's mixer channel: trim, audio-follow-video, delay, high-pass, gate, 3-band EQ, compressor.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Audio channel",
+            "x-audience": "function",
+            "properties": {
+              "trimDb": {
+                "type": "number",
+                "title": "Input trim (dB)",
+                "minimum": -20,
+                "maximum": 20,
+                "default": 0
+              },
+              "afv": {
+                "type": "boolean",
+                "title": "Audio follows video",
+                "description": "Cutting to this source un-mutes it.",
+                "default": true
+              },
+              "delayMs": {
+                "type": "integer",
+                "title": "Audio delay (ms)",
+                "minimum": 0,
+                "maximum": 500,
+                "default": 0,
+                "description": "Lip-sync correction, on top of the source's alignment delay."
+              },
+              "highPass": {
+                "type": "object",
+                "title": "High-pass filter",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "On",
+                    "default": false
+                  },
+                  "frequencyHz": {
+                    "type": "number",
+                    "title": "Frequency (Hz)",
+                    "minimum": 20,
+                    "maximum": 500,
+                    "default": 80,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              },
+              "gate": {
+                "type": "object",
+                "title": "Noise gate",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "On",
+                    "default": false
+                  },
+                  "thresholdDb": {
+                    "type": "number",
+                    "title": "Threshold (dB)",
+                    "minimum": -60,
+                    "maximum": 0,
+                    "default": -40,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  },
+                  "rangeDb": {
+                    "type": "number",
+                    "title": "Range (dB)",
+                    "minimum": -80,
+                    "maximum": -20,
+                    "default": -40,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  },
+                  "attackMs": {
+                    "type": "number",
+                    "title": "Attack (ms)",
+                    "minimum": 0.01,
+                    "maximum": 10,
+                    "default": 5,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  },
+                  "releaseMs": {
+                    "type": "number",
+                    "title": "Release (ms)",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  },
+                  "holdMs": {
+                    "type": "number",
+                    "title": "Hold (ms)",
+                    "minimum": 0,
+                    "maximum": 500,
+                    "default": 50,
+                    "x-when": {
+                      "enabled": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              },
+              "eq": {
+                "type": "object",
+                "title": "Equaliser",
+                "properties": {
+                  "low": {
+                    "type": "object",
+                    "title": "Low shelf",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "title": "On",
+                        "default": false
+                      },
+                      "frequencyHz": {
+                        "type": "number",
+                        "title": "Frequency (Hz)",
+                        "minimum": 20,
+                        "maximum": 20000,
+                        "default": 100,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "gainDb": {
+                        "type": "number",
+                        "title": "Gain (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "q": {
+                        "type": "number",
+                        "title": "Q",
+                        "minimum": 0.1,
+                        "maximum": 20,
+                        "default": 0.7,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "mid": {
+                    "type": "object",
+                    "title": "Mid peak",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "title": "On",
+                        "default": false
+                      },
+                      "frequencyHz": {
+                        "type": "number",
+                        "title": "Frequency (Hz)",
+                        "minimum": 20,
+                        "maximum": 20000,
+                        "default": 1000,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "gainDb": {
+                        "type": "number",
+                        "title": "Gain (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "q": {
+                        "type": "number",
+                        "title": "Q",
+                        "minimum": 0.1,
+                        "maximum": 20,
+                        "default": 0.7,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "high": {
+                    "type": "object",
+                    "title": "High shelf",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "title": "On",
+                        "default": false
+                      },
+                      "frequencyHz": {
+                        "type": "number",
+                        "title": "Frequency (Hz)",
+                        "minimum": 20,
+                        "maximum": 20000,
+                        "default": 8000,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "gainDb": {
+                        "type": "number",
+                        "title": "Gain (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "q": {
+                        "type": "number",
+                        "title": "Q",
+                        "minimum": 0.1,
+                        "maximum": 20,
+                        "default": 0.7,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "compressor": {
+                "type": "object",
+                "title": "Compressor",
+                "properties": {
+                  "thresholdDb": {
+                    "type": "number",
+                    "title": "Threshold (dB)",
+                    "minimum": -40,
+                    "maximum": 0,
+                    "default": 0
+                  },
+                  "ratio": {
+                    "type": "number",
+                    "title": "Ratio",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 1,
+                    "description": "1 = off."
+                  },
+                  "attackMs": {
+                    "type": "number",
+                    "title": "Attack (ms)",
+                    "minimum": 0.1,
+                    "maximum": 100,
+                    "default": 5
+                  },
+                  "releaseMs": {
+                    "type": "number",
+                    "title": "Release (ms)",
+                    "minimum": 10,
+                    "maximum": 1000,
+                    "default": 100
+                  },
+                  "makeupGainDb": {
+                    "type": "number",
+                    "title": "Make-up gain (dB)",
+                    "minimum": 0,
+                    "maximum": 24,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.option.key",
+        "name": "Upstream key",
+        "group": "switcher-options",
+        "kind": "option",
+        "key": "key",
+        "description": "A chroma, luma or neural key on this source, composited onto the programme.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Upstream key",
+            "x-audience": "function",
+            "properties": {
+              "type": {
+                "type": "string",
+                "title": "Key",
+                "enum": [
+                  "off",
+                  "chroma",
+                  "luma",
+                  "neural"
+                ],
+                "default": "off"
+              },
+              "keyColorY": {
+                "type": "integer",
+                "title": "Key colour Y",
+                "minimum": 0,
+                "maximum": 255,
+                "default": 145,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "keyColorCb": {
+                "type": "integer",
+                "title": "Key colour Cb",
+                "minimum": 0,
+                "maximum": 255,
+                "default": 54,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "keyColorCr": {
+                "type": "integer",
+                "title": "Key colour Cr",
+                "minimum": 0,
+                "maximum": 255,
+                "default": 34,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "similarity": {
+                "type": "number",
+                "title": "Similarity",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.4,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "smoothness": {
+                "type": "number",
+                "title": "Smoothness",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "spillSuppress": {
+                "type": "number",
+                "title": "Spill suppression",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.5,
+                "x-when": {
+                  "type": [
+                    "chroma"
+                  ]
+                }
+              },
+              "lowClip": {
+                "type": "number",
+                "title": "Low clip",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0,
+                "x-when": {
+                  "type": [
+                    "luma"
+                  ]
+                }
+              },
+              "highClip": {
+                "type": "number",
+                "title": "High clip",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 1,
+                "x-when": {
+                  "type": [
+                    "luma"
+                  ]
+                }
+              },
+              "softness": {
+                "type": "number",
+                "title": "Softness",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.1,
+                "x-when": {
+                  "type": [
+                    "luma"
+                  ]
+                }
+              },
+              "fillSource": {
+                "type": "string",
+                "title": "Fill source",
+                "description": "Label of the source giving the fill; empty = this source.",
+                "x-when": {
+                  "type": [
+                    "chroma",
+                    "luma",
+                    "neural"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.output.srt",
+        "name": "SRT program output",
+        "group": "switcher-outputs",
+        "kind": "block",
+        "description": "Sends the encoded programme (MPEG-TS) to an SRT destination, as caller (push) or listener (pull). Scale out for several destinations; each can keep or strip SCTE-35.",
+        "external": {
+          "direction": "out",
+          "protocol": "srt",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "key": "srt",
+        "rules": {
+          "requires": [
+            {
+              "anyOf": [
+                "switcher.encoder"
+              ],
+              "message": "needs a program encoder (add Program encoder)"
+            }
+          ]
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "SRT destination",
+            "x-audience": "function",
+            "required": [
+              "mode",
+              "address",
+              "port",
+              "latencyMs",
+              "passphrase"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "caller",
+                  "listener"
+                ],
+                "default": "caller",
+                "description": "Caller: we push to the destination. Listener: the destination pulls from us."
+              },
+              "address": {
+                "type": "string",
+                "title": "Destination host",
+                "x-when": {
+                  "mode": [
+                    "caller"
+                  ]
+                }
+              },
+              "port": {
+                "type": "integer",
+                "title": "Destination port",
+                "minimum": 1,
+                "maximum": 65535,
+                "x-when": {
+                  "mode": [
+                    "caller"
+                  ]
+                }
+              },
+              "streamId": {
+                "type": "string",
+                "title": "Stream ID"
+              },
+              "latencyMs": {
+                "type": "integer",
+                "title": "Latency (ms)",
+                "minimum": 20,
+                "maximum": 8000,
+                "default": 120
+              },
+              "encryption": {
+                "type": "string",
+                "title": "Encryption",
+                "enum": [
+                  "off",
+                  "aes-128",
+                  "aes-256"
+                ],
+                "default": "off"
+              },
+              "passphrase": {
+                "type": "string",
+                "title": "Passphrase",
+                "format": "secret-ref",
+                "x-when": {
+                  "encryption": [
+                    "aes-128",
+                    "aes-256"
+                  ]
+                }
+              },
+              "maxBandwidthMbps": {
+                "type": "number",
+                "title": "Max bandwidth (Mbit/s)",
+                "description": "0 = unlimited.",
+                "minimum": 0,
+                "default": 0
+              },
+              "maxConnections": {
+                "type": "integer",
+                "title": "Max connections",
+                "minimum": 1,
+                "maximum": 64,
+                "default": 1,
+                "x-when": {
+                  "mode": [
+                    "listener"
+                  ]
+                }
+              },
+              "scte35": {
+                "type": "boolean",
+                "title": "Pass SCTE-35 cues",
+                "default": true
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.output.rtmp",
+        "name": "RTMP program output",
+        "group": "switcher-outputs",
+        "kind": "block",
+        "description": "Pushes the programme to an RTMP(S) ingest, e.g. a streaming platform.",
+        "external": {
+          "direction": "out",
+          "protocol": "rtmp",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        },
+        "key": "rtmp",
+        "rules": {
+          "requires": [
+            {
+              "anyOf": [
+                "switcher.encoder"
+              ],
+              "message": "needs a program encoder (add Program encoder)"
+            }
+          ]
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "RTMP destination",
+            "x-audience": "function",
+            "required": [
+              "url"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "title": "Ingest URL",
+                "description": "rtmp:// or rtmps:// URL of the ingest."
+              },
+              "streamKey": {
+                "type": "string",
+                "title": "Stream key",
+                "format": "secret-ref"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.output.mxl",
+        "name": "MXL program output",
+        "group": "switcher-outputs",
+        "kind": "block",
+        "description": "Publishes the programme uncompressed on MXL (V210 video, float32 audio, VANC data with captions and SCTE-104) in the programme format.",
+        "mxlOutputs": true
+      },
+      {
+        "id": "switcher.output.st2110",
+        "name": "ST 2110 program output",
+        "group": "switcher-outputs",
+        "kind": "block",
+        "description": "Sends the programme as an SMPTE ST 2110 essence group, registered with NMOS.",
+        "external": {
+          "direction": "out",
+          "protocol": "st2110",
+          "essenceOptions": [
+            "video",
+            "audio"
+          ]
+        }
+      },
+      {
+        "id": "switcher.output.recording",
+        "name": "Program recording",
+        "group": "switcher-outputs",
+        "kind": "block",
+        "description": "Records the encoded programme as MPEG-TS files with time and size rotation. Bind a storage dependency on the instance for where the files go.",
+        "key": "recording",
+        "rules": {
+          "maxPerModule": 1,
+          "requires": [
+            {
+              "anyOf": [
+                "switcher.encoder"
+              ],
+              "message": "needs a program encoder (add Program encoder)"
+            }
+          ]
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Recording",
+            "x-audience": "function",
+            "properties": {
+              "rotateAfterMinutes": {
+                "type": "integer",
+                "title": "New file every (min)",
+                "description": "0 = never rotate on time.",
+                "minimum": 0,
+                "maximum": 1440,
+                "default": 60
+              },
+              "maxFileSizeMB": {
+                "type": "integer",
+                "title": "Max file size (MB)",
+                "description": "0 = unlimited.",
+                "minimum": 0,
+                "default": 0
+              },
+              "filenamePrefix": {
+                "type": "string",
+                "title": "File name prefix",
+                "default": "program"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.engine",
+        "name": "Switching engine",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Programme / preview switching: cut, auto transition, T-bar, hot-punch, fade to black. Every source is decoded continuously into the programme format; a frame synchronizer aligns sources of different rates.",
+        "key": "engine",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Programme format & timing",
+            "x-audience": "function",
+            "required": [
+              "resolution",
+              "rate"
+            ],
+            "properties": {
+              "resolution": {
+                "type": "string",
+                "title": "Resolution",
+                "enum": [
+                  "1280x720",
+                  "1920x1080",
+                  "3840x2160"
+                ],
+                "default": "1920x1080",
+                "x-flow": "frameSize"
+              },
+              "rate": {
+                "type": "string",
+                "title": "Frame rate",
+                "enum": [
+                  "23.976",
+                  "24",
+                  "25",
+                  "29.97",
+                  "30",
+                  "50",
+                  "59.94",
+                  "60"
+                ],
+                "default": "29.97",
+                "x-flow": "grainRate",
+                "description": "23.976 and 24 exist only at 1080."
+              },
+              "scan": {
+                "type": "string",
+                "title": "Scan",
+                "enum": [
+                  "progressive"
+                ],
+                "default": "progressive",
+                "x-flow": "interlace"
+              },
+              "colorProfile": {
+                "type": "string",
+                "title": "Colour profile",
+                "enum": [
+                  "standard",
+                  "standard-hevc",
+                  "professional"
+                ],
+                "default": "standard",
+                "description": "standard: 8-bit 4:2:0 H.264; standard-hevc: 8-bit HEVC; professional: 10-bit 4:2:2."
+              },
+              "colorspace": {
+                "type": "string",
+                "title": "Colorspace",
+                "enum": [
+                  "BT709"
+                ],
+                "default": "BT709",
+                "x-flow": "colorspace"
+              },
+              "frameSync": {
+                "type": "string",
+                "title": "Frame synchronizer",
+                "enum": [
+                  "off",
+                  "freerun",
+                  "source-driven"
+                ],
+                "default": "off",
+                "description": "freerun: smooth output on its own clock; source-driven: lower latency."
+              },
+              "frameRateConversion": {
+                "type": "string",
+                "title": "Frame-rate conversion",
+                "enum": [
+                  "none",
+                  "nearest",
+                  "blend",
+                  "mcfi"
+                ],
+                "default": "none",
+                "description": "For sources at another rate; mcfi = motion-compensated."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.transitions",
+        "name": "Transitions",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Mix, dip, wipe (6 directions, soft edge), stinger (PNG sequence + audio) and fade to black, with easing curves. Operated live; nothing to set up.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.audio",
+        "name": "Audio mixer",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Per-source channels (set on each source) into a master bus with limiter and BS.1770-4 loudness metering. Faders and mutes are operated live.",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "key": "master",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Master bus",
+            "x-audience": "function",
+            "properties": {
+              "limiter": {
+                "type": "object",
+                "title": "Limiter",
+                "properties": {
+                  "thresholdDb": {
+                    "type": "number",
+                    "title": "Threshold (dB)",
+                    "minimum": -24,
+                    "maximum": 0,
+                    "default": -3
+                  },
+                  "ceilingDb": {
+                    "type": "number",
+                    "title": "Ceiling (dB)",
+                    "minimum": -12,
+                    "maximum": 0,
+                    "default": -1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.keyers",
+        "name": "Keyers & DVE",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Upstream chroma and luma keys per source; picture-in-picture, side-by-side and quad layouts. Operated live.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.graphics",
+        "name": "Downstream graphics",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "8-layer downstream keyer with HTML graphics templates (rendered by a browser sidecar) and animations. Operated live.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.colorgrade",
+        "name": "Colour grading",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "3D LUT looks (.cube import) on the programme. Operated live.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.stmap",
+        "name": "Lens correction & effects",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "ST map warps per source or on the programme: barrel/pincushion/fisheye correction, corner pin, animated effects. Operated live.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.encoder",
+        "name": "Program encoder",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Encodes the programme for SRT, RTMP and recording. Hardware encoders are used when the host has them. Attach the codecs it produces.",
+        "key": "encoder",
+        "rules": {
+          "maxPerModule": 1,
+          "needsAddon": [
+            {
+              "group": "codecs",
+              "min": 1,
+              "message": "choose the programme codecs (e.g. H.264 or HEVC, and AAC)"
+            }
+          ]
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Programme encoding",
+            "x-audience": "function",
+            "properties": {
+              "bitrateMbps": {
+                "type": "number",
+                "title": "Bitrate (Mbit/s)",
+                "description": "0 = automatic from the resolution.",
+                "minimum": 0,
+                "default": 0
+              },
+              "gopSeconds": {
+                "type": "integer",
+                "title": "Keyframe interval (s)",
+                "enum": [
+                  1,
+                  2,
+                  4
+                ],
+                "default": 2
+              },
+              "preset": {
+                "type": "string",
+                "title": "Encoder preset",
+                "enum": [
+                  "low-latency",
+                  "balanced",
+                  "quality"
+                ],
+                "default": "balanced"
+              },
+              "timecode": {
+                "type": "boolean",
+                "title": "Insert SMPTE timecode",
+                "default": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.captions",
+        "name": "Closed captions",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "CEA-608/708 captions on the programme: pass through the source's, or author them live. Embedded in H.264/HEVC (SEI) and in MXL VANC (ST 334).",
+        "key": "captions",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Captions",
+            "x-audience": "function",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "off",
+                  "passthrough",
+                  "author"
+                ],
+                "default": "passthrough",
+                "description": "passthrough: keep the selected source's captions; author: typed live or from speech-to-text."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.scte35",
+        "name": "SCTE-35 ad insertion",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Ad-break cues in the programme TS, with signal conditioning rules per destination.",
+        "key": "scte35",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "SCTE-35",
+            "x-audience": "function",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Insert SCTE-35",
+                "default": true
+              },
+              "pid": {
+                "type": "integer",
+                "title": "PID",
+                "minimum": 32,
+                "maximum": 8190,
+                "default": 258,
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                }
+              },
+              "prerollMs": {
+                "type": "integer",
+                "title": "Pre-roll (ms)",
+                "minimum": 0,
+                "maximum": 60000,
+                "default": 4000,
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                }
+              },
+              "heartbeatMs": {
+                "type": "integer",
+                "title": "Heartbeat (ms)",
+                "description": "splice_null interval; 0 = off.",
+                "minimum": 0,
+                "maximum": 60000,
+                "default": 5000,
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                }
+              },
+              "verify": {
+                "type": "boolean",
+                "title": "Verify each cue",
+                "default": true,
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                }
+              },
+              "webhookUrl": {
+                "type": "string",
+                "title": "Event webhook URL",
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                }
+              },
+              "defaultRule": {
+                "type": "string",
+                "title": "When no rule matches",
+                "enum": [
+                  "pass",
+                  "drop",
+                  "rewrite"
+                ],
+                "default": "pass",
+                "x-when": {
+                  "enabled": [
+                    true
+                  ]
+                },
+                "description": "Signal conditioning default action."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.replay",
+        "name": "Instant replay",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Per-source replay buffers with mark in/out and slow motion down to 0.25× (frame interpolation, pitch-preserved audio). Played back as a virtual source.",
+        "key": "replay",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Replay",
+            "x-audience": "function",
+            "properties": {
+              "bufferSeconds": {
+                "type": "integer",
+                "title": "Buffer per source (s)",
+                "minimum": 1,
+                "maximum": 300,
+                "default": 300
+              },
+              "shutterAngle": {
+                "type": "integer",
+                "title": "Slow-motion shutter angle (°)",
+                "minimum": 0,
+                "maximum": 360,
+                "default": 180,
+                "description": "Motion blur on slow motion; higher = more blur."
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.clips",
+        "name": "Clip players",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Four clip players (MPEG-TS, MP4, MOV) appearing as virtual sources. Bind a storage dependency on the instance for the clip library.",
+        "key": "clips",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Clip library",
+            "x-audience": "function",
+            "properties": {
+              "storageMaxGB": {
+                "type": "integer",
+                "title": "Library size limit (GB)",
+                "minimum": 1,
+                "maximum": 10000,
+                "default": 10
+              },
+              "ephemeralTtlHours": {
+                "type": "integer",
+                "title": "Keep temporary clips (h)",
+                "minimum": 1,
+                "maximum": 720,
+                "default": 24
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.playout",
+        "name": "Playout channels",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Two playlist channels (clips, live, slates) with commercial-break pods and SCTE-35, appearing as virtual sources.",
+        "key": "playout",
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Playout",
+            "x-audience": "function",
+            "properties": {
+              "cacheMaxGB": {
+                "type": "integer",
+                "title": "Asset cache limit (GB)",
+                "minimum": 1,
+                "maximum": 10000,
+                "default": 200
+              },
+              "asRunRetentionDays": {
+                "type": "integer",
+                "title": "Keep as-run logs (days)",
+                "minimum": 1,
+                "maximum": 3650,
+                "default": 30
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.ai-segment",
+        "name": "AI background removal",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Removes the background behind people without a green screen. Needs an NVIDIA GPU (TensorRT): declare one in the instance's resource profile.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.comms",
+        "name": "Operator comms",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "Party-line voice between up to six operators (N-1 mix, push-to-talk, ducks programme audio). Operated live.",
+        "rules": {
+          "maxPerModule": 1
+        }
+      },
+      {
+        "id": "switcher.control",
+        "name": "Control room",
+        "group": "switcher-features",
+        "kind": "block",
+        "description": "The browser control surface: multiview, preview/program, mixer, macros and presets, for director, audio, graphics and viewer roles. Operators reach it over WebTransport.",
+        "key": "control",
+        "includes": [
+          "option.network"
+        ],
+        "rules": {
+          "maxPerModule": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Control room",
+            "x-audience": "function",
+            "properties": {
+              "previewProxy": {
+                "type": "boolean",
+                "title": "Low-bitrate source previews",
+                "description": "Cuts browser bandwidth (about 55 → 10 Mbit/s).",
+                "default": true
+              },
+              "previewResolution": {
+                "type": "string",
+                "title": "Preview resolution",
+                "enum": [
+                  "360p",
+                  "480p",
+                  "720p"
+                ],
+                "default": "480p",
+                "x-when": {
+                  "previewProxy": [
+                    true
+                  ]
+                }
+              },
+              "previewBitrateKbps": {
+                "type": "integer",
+                "title": "Preview bitrate (kbit/s)",
+                "minimum": 100,
+                "maximum": 5000,
+                "default": 500,
+                "x-when": {
+                  "previewProxy": [
+                    true
+                  ]
+                }
+              },
+              "relayResolution": {
+                "type": "string",
+                "title": "Source relay resolution",
+                "enum": [
+                  "360p",
+                  "480p",
+                  "720p",
+                  "source"
+                ],
+                "default": "720p"
+              },
+              "relayBitrateKbps": {
+                "type": "integer",
+                "title": "Source relay bitrate (kbit/s)",
+                "minimum": 100,
+                "maximum": 50000,
+                "default": 2000
+              },
+              "allowedOrigins": {
+                "type": "string",
+                "title": "Allowed browser origins",
+                "description": "Comma-separated; empty = any."
+              },
+              "access": {
+                "type": "object",
+                "title": "Access",
+                "properties": {
+                  "apiToken": {
+                    "type": "string",
+                    "title": "API token",
+                    "format": "secret-ref",
+                    "description": "Empty: one is generated at start."
+                  },
+                  "directorInvite": {
+                    "type": "string",
+                    "title": "Director invite token",
+                    "format": "secret-ref"
+                  },
+                  "audioInvite": {
+                    "type": "string",
+                    "title": "Audio operator invite token",
+                    "format": "secret-ref"
+                  },
+                  "graphicsInvite": {
+                    "type": "string",
+                    "title": "Graphics operator invite token",
+                    "format": "secret-ref"
+                  },
+                  "viewerInvite": {
+                    "type": "string",
+                    "title": "Viewer invite token",
+                    "format": "secret-ref"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.asr",
+        "name": "AI speech-to-text",
+        "group": "switcher-addons",
+        "kind": "addon",
+        "description": "Live transcription feeding the captions (Parakeet or Whisper; GPU-accelerated when available).",
+        "key": "asr",
+        "rules": {
+          "attachTo": [
+            "switcher.captions"
+          ],
+          "maxPerBlock": 1
+        },
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Speech-to-text",
+            "x-audience": "function",
+            "properties": {
+              "backend": {
+                "type": "string",
+                "title": "Engine",
+                "enum": [
+                  "parakeet",
+                  "whisper"
+                ],
+                "default": "parakeet"
+              },
+              "model": {
+                "type": "string",
+                "title": "Model",
+                "description": "e.g. large-v3-turbo (Whisper); empty = the engine's default."
+              },
+              "confidence": {
+                "type": "string",
+                "title": "Confidence filter",
+                "enum": [
+                  "off",
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "default": "medium"
+              },
+              "speakerDetection": {
+                "type": "boolean",
+                "title": "Speaker detection",
+                "default": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "switcher.scte104",
+        "name": "SCTE-104 on MXL",
+        "group": "switcher-addons",
+        "kind": "addon",
+        "description": "Reads and writes SCTE-104 automation messages on MXL data flows, translated to and from SCTE-35.",
+        "rules": {
+          "attachTo": [
+            "switcher.scte35"
+          ],
+          "maxPerBlock": 1,
+          "requires": [
+            {
+              "anyOf": [
+                "switcher.input.mxl",
+                "switcher.output.mxl"
+              ],
+              "message": "needs an MXL source or MXL program output"
+            }
+          ]
         }
       }
     ]

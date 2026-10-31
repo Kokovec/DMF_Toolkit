@@ -41,11 +41,13 @@ export class Catalog {
     return [...this.latestById.values()]
   }
 
-  // Latest version of every module listed under a category (palette heading), by vendor then name.
-  forCategory(category: string): VendorModule[] {
-    return this.latest()
-      .filter((p) => p.categories?.includes(category))
-      .sort((a, b) => (a.vendor ?? '').localeCompare(b.vendor ?? '') || a.name.localeCompare(b.name))
+  // Latest version of every module, grouped by company (palette heading), companies and products by name.
+  byCompany(): { company: string; modules: VendorModule[] }[] {
+    const groups = new Map<string, VendorModule[]>()
+    for (const m of this.latest()) groups.set(m.vendor, [...(groups.get(m.vendor) ?? []), m])
+    return [...groups]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([company, modules]) => ({ company, modules: modules.sort((a, b) => a.name.localeCompare(b.name)) }))
   }
 }
 

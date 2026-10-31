@@ -26,20 +26,21 @@ brief maps to a field:
 | Brief | Field | Set where |
 |---|---|---|
 | **Workflow intent** | `metadata.description` | Inspector → Workload → *Workflow intent* |
-| **Session parameters** (SRT: mode, bonding, latency, encryption, passphrase, stream ID, MTU; per path `pathA` / `pathB` {port, remote address}), *injected into the function* | `functions[].parameters.<block>.srt`, e.g. `parameters.srt1.srt` (one group per block of the module's design; fields shown/required by `x-when`); secrets as `{"$secret": name}` | Inspector → function → SRT session |
-| **Incoming stream bitrate + payload** (MPEG-TS, codecs) | `functions[].parameters.<block>.payload.pathA` / `.pathB` {bitrateMbps (required), container, videoCodec, audioCodec} | Inspector → function → Expected payload |
-| **Network constraints** (exposure; per path `pathA` / `pathB` {network, zone, VLAN}), *for the orchestrator* | `functions[].parameters.<block>.network` (`x-audience: orchestrator`) | Inspector → function → Network constraints |
+| **Session parameters** (SRT: mode, bonding, latency, encryption, passphrase, stream ID, MTU; per path `pathA` / `pathB` {port, remote address}), *injected into the function* | `functions[].parameters.<block>.srt`, e.g. `parameters.srt1.srt` (one group per block of the module's design; fields shown/required by `x-when`); secrets as `{"$secret": name}` | Function dialog → SRT session |
+| **Incoming stream bitrate + payload** (MPEG-TS, codecs) | `functions[].parameters.<block>.payload.pathA` / `.pathB` {bitrateMbps (required), container, videoCodec, audioCodec} | Function dialog → Expected payload |
+| **Network constraints** (exposure; per path `pathA` / `pathB` {network, zone, VLAN}), *for the orchestrator* | `functions[].parameters.<block>.network` (`x-audience: orchestrator`) | Function dialog → Network constraints |
 | **MXL flow definition**: domain, flow ID/UUID, essence formats, grain rate, history depth | `spec.flows[]`: `id` (UUID v5, stable across revisions), `domain`, `essence`, `format` (media type `video/v210` / `audio/float32` / `video/smpte291`, grain rate, frame size, interlace, colorspace, sample rate, channels), `historyMs` | Derived from the writer's output settings + workload defaults; overrides on the wire (Flow panel) |
 | **Connection graph**: MXL writer and readers, multi-hop | `spec.flows[].writer` / `.readers` (and `spec.wires` port → port, including external edges) | Canvas wiring |
-| **Resource profile**: CPU/GPU, memory, network, storage | `functions[].resources` (per instance) | Inspector → function → Resource profile |
-| **Scaling / resilience expectations** | `functions[].expectations` (`resilience`: none / 1+1 / N+1; `scaling`: fixed / elastic) | Inspector → function → Expectations |
-| **Placement / constraints**: host/cluster, affinity, on-prem vs cloud, licensing | `functions[].placement` (`site`, `cluster`, `environment`, `with`, `apart`, `licensing`) | Inspector → function → Placement constraints |
-| **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = the instance's control declares NMOS | Inspector → function → Discovery; Flow panel |
-| Domain | `functions[].domain`, `spec.domains[]` | Inspector → function → MXL domain |
-| **Inputs used** (which input functions run, and how many copies) | `functions[].inputs` (input block id → copies; 0 = not used); parameters and ports follow (copies: `srt1`, `srt1_2`, …) | Inspector → function → Inputs |
-| **Vendor settings** (the product's own configuration) | `functions[].settings` (free-form JSON, passed through) | Inspector → function → *vendor* settings |
-| **Control & health** | `functions[].control` (`api`, `nmos`, `health`; health required) | Inspector → function → Control & health |
-| **Dependencies** | `functions[].dependencies[]` (`name`, `kind`, `required`, `role`, `binding`) | Inspector → function → Dependencies |
+| **Resource profile**: CPU/GPU, memory, network, storage | `functions[].resources` (per instance) | Function dialog → Resource profile |
+| **Scaling / resilience expectations** | `functions[].expectations` (`resilience`: none / 1+1 / N+1; `scaling`: fixed / elastic) | Function dialog → Expectations |
+| **Placement / constraints**: host/cluster, affinity, on-prem vs cloud, licensing | `functions[].placement` (`site`, `cluster`, `environment`, `with`, `apart`, `licensing`) | Function dialog → Placement constraints |
+| **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = the instance's control declares NMOS | Function dialog → Discovery; Flow panel |
+| Domain | `functions[].domain`, `spec.domains[]` | Function dialog → MXL domain |
+| **Inputs used** (which input functions run, and how many copies) | `functions[].inputs` (input block id → copies; 0 = not used); parameters and ports follow (copies: `srt1`, `srt1_2`, …) | Function dialog → Inputs |
+| **Outputs used** (which outputs run, and how many copies; 0 = off) | `functions[].outputs` (output block id → copies); parameters and ports follow (copies: `srt-out`, `srt-out_2`, …) | Function dialog → Outputs |
+| **Vendor settings** (the product's own configuration) | `functions[].settings` (free-form JSON, passed through) | Function dialog → *vendor* settings |
+| **Control & health** | `functions[].control` (`api`, `nmos`, `health`; health required) | Function dialog → Control & health |
+| **Dependencies** | `functions[].dependencies[]` (`name`, `kind`, `required`, `role`, `binding`) | Function dialog → Dependencies |
 | Library version | `metadata.libraryVersion`: the feature library the state was designed against; fetch it from `GET /api/library/:version` | automatic |
 
 These are **requirements and constraints, not decisions**: e.g. `placement.site` is a

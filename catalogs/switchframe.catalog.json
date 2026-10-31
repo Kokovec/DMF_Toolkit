@@ -1,0 +1,3569 @@
+{
+  "apiVersion": "dmf-toolkit/v1alpha3",
+  "kind": "ModuleCatalog",
+  "metadata": {
+    "id": "switchframe",
+    "name": "Switchframe",
+    "version": "1",
+    "vendor": "Switchframe"
+  },
+  "spec": {
+    "modules": [
+      {
+        "id": "switchframe.1",
+        "version": "1.0.0",
+        "name": "Switchframe",
+        "description": "Browser-operated live production switcher: SRT, MoQ, MXL and ST 2110 sources; switching, transitions, audio mixing, keying and DVE, graphics, colour grading, captions (with AI speech-to-text), SCTE-35/104, instant replay, clip players and playout; programme out over SRT, RTMP, MXL, ST 2110 and to recording. GPU-accelerated when the host has one.",
+        "categories": [
+          "production"
+        ],
+        "vendor": "Switchframe",
+        "product": "Switchframe",
+        "productVersion": "main@7923615 (2026-06-09)",
+        "capability": {
+          "produces": [
+            "video",
+            "audio",
+            "data"
+          ],
+          "consumes": [
+            "video",
+            "audio",
+            "data"
+          ],
+          "scaling": "singleton"
+        },
+        "design": {
+          "blocks": [
+            {
+              "id": "srt-src",
+              "feature": "switcher.input.srt",
+              "addons": [],
+              "scaleOut": 16
+            },
+            {
+              "id": "moq-src",
+              "feature": "switcher.input.moq",
+              "addons": [],
+              "scaleOut": 8
+            },
+            {
+              "id": "mxl-src",
+              "feature": "switcher.input.mxl",
+              "addons": [],
+              "scaleOut": 8
+            },
+            {
+              "id": "st2110-src",
+              "feature": "switcher.input.st2110",
+              "addons": [],
+              "scaleOut": 8
+            },
+            {
+              "id": "engine",
+              "feature": "switcher.engine",
+              "addons": []
+            },
+            {
+              "id": "transitions",
+              "feature": "switcher.transitions",
+              "addons": []
+            },
+            {
+              "id": "audio",
+              "feature": "switcher.audio",
+              "addons": []
+            },
+            {
+              "id": "keyers",
+              "feature": "switcher.keyers",
+              "addons": []
+            },
+            {
+              "id": "graphics",
+              "feature": "switcher.graphics",
+              "addons": []
+            },
+            {
+              "id": "colorgrade",
+              "feature": "switcher.colorgrade",
+              "addons": []
+            },
+            {
+              "id": "stmap",
+              "feature": "switcher.stmap",
+              "addons": []
+            },
+            {
+              "id": "encoder",
+              "feature": "switcher.encoder",
+              "addons": [
+                "codec.h264",
+                "codec.hevc",
+                "codec.aac"
+              ]
+            },
+            {
+              "id": "captions",
+              "feature": "switcher.captions",
+              "addons": [
+                "switcher.asr"
+              ]
+            },
+            {
+              "id": "scte35",
+              "feature": "switcher.scte35",
+              "addons": [
+                "switcher.scte104"
+              ]
+            },
+            {
+              "id": "replay",
+              "feature": "switcher.replay",
+              "addons": []
+            },
+            {
+              "id": "clips",
+              "feature": "switcher.clips",
+              "addons": []
+            },
+            {
+              "id": "playout",
+              "feature": "switcher.playout",
+              "addons": []
+            },
+            {
+              "id": "ai-segment",
+              "feature": "switcher.ai-segment",
+              "addons": []
+            },
+            {
+              "id": "comms",
+              "feature": "switcher.comms",
+              "addons": []
+            },
+            {
+              "id": "control",
+              "feature": "switcher.control",
+              "addons": []
+            },
+            {
+              "id": "srt-out",
+              "feature": "switcher.output.srt",
+              "addons": [],
+              "scaleOut": 8
+            },
+            {
+              "id": "rtmp-out",
+              "feature": "switcher.output.rtmp",
+              "addons": [],
+              "scaleOut": 4
+            },
+            {
+              "id": "mxl-out",
+              "feature": "switcher.output.mxl",
+              "addons": []
+            },
+            {
+              "id": "st2110-out",
+              "feature": "switcher.output.st2110",
+              "addons": []
+            },
+            {
+              "id": "recording",
+              "feature": "switcher.output.recording",
+              "addons": []
+            }
+          ],
+          "moduleFeatures": [],
+          "inputRule": "several"
+        },
+        "ports": [
+          {
+            "id": "srt-src.in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "srt"
+            }
+          },
+          {
+            "id": "moq-src.in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "moq"
+            }
+          },
+          {
+            "id": "mxl-src.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "timeContext": "mxl-src",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl-src.audio",
+            "direction": "in",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "formats": [
+              "audio/float32"
+            ],
+            "timeContext": "mxl-src",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl-src.anc",
+            "direction": "in",
+            "essence": "data",
+            "cardinality": "0..1",
+            "formats": [
+              "video/smpte291"
+            ],
+            "timeContext": "mxl-src",
+            "transport": "mxl"
+          },
+          {
+            "id": "st2110-src.in.video",
+            "direction": "in",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "st2110"
+            }
+          },
+          {
+            "id": "srt-out.out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "srt"
+            }
+          },
+          {
+            "id": "rtmp-out.out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "rtmp"
+            }
+          },
+          {
+            "id": "mxl-out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "formats": [
+              "video/v210"
+            ],
+            "timeContext": "mxl-out",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl-out.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "formats": [
+              "audio/float32"
+            ],
+            "timeContext": "mxl-out",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl-out.anc",
+            "direction": "out",
+            "essence": "data",
+            "cardinality": "0..1",
+            "formats": [
+              "video/smpte291"
+            ],
+            "timeContext": "mxl-out",
+            "transport": "mxl"
+          },
+          {
+            "id": "st2110-out.out.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "1",
+            "formats": [
+              "video/v210"
+            ],
+            "transport": {
+              "external": "st2110"
+            }
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "srt-src": {
+                "type": "object",
+                "title": "SRT source · srt-src",
+                "properties": {
+                  "srt": {
+                    "type": "object",
+                    "title": "SRT source",
+                    "x-audience": "function",
+                    "required": [
+                      "mode",
+                      "address",
+                      "latencyMs"
+                    ],
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "title": "Mode",
+                        "enum": [
+                          "listener",
+                          "caller"
+                        ],
+                        "default": "listener",
+                        "description": "Listener: the source pushes to us. Caller: we pull from the source."
+                      },
+                      "address": {
+                        "type": "string",
+                        "title": "Source address",
+                        "description": "host:port of the source to pull from.",
+                        "x-when": {
+                          "mode": [
+                            "caller"
+                          ]
+                        }
+                      },
+                      "streamId": {
+                        "type": "string",
+                        "title": "Stream ID",
+                        "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller)."
+                      },
+                      "latencyMs": {
+                        "type": "integer",
+                        "title": "Latency (ms)",
+                        "minimum": 20,
+                        "maximum": 8000,
+                        "default": 120
+                      },
+                      "inputBandwidthMbps": {
+                        "type": "number",
+                        "title": "Input bandwidth (Mbit/s)",
+                        "description": "0 = estimate automatically.",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "overheadPercent": {
+                        "type": "integer",
+                        "title": "Recovery overhead (%)",
+                        "description": "Bandwidth kept for retransmission.",
+                        "minimum": 5,
+                        "maximum": 100,
+                        "default": 25
+                      }
+                    }
+                  },
+                  "source": {
+                    "type": "object",
+                    "title": "Source",
+                    "x-audience": "function",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Shown on the multiview (max 64 characters)."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "title": "Multiview position",
+                        "minimum": 1,
+                        "maximum": 64,
+                        "description": "Order on the multiview; empty = in the order sources are added."
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Alignment delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Delays this source's video and audio to line it up with the others."
+                      }
+                    }
+                  },
+                  "audio": {
+                    "type": "object",
+                    "title": "Audio channel",
+                    "x-audience": "function",
+                    "properties": {
+                      "trimDb": {
+                        "type": "number",
+                        "title": "Input trim (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0
+                      },
+                      "afv": {
+                        "type": "boolean",
+                        "title": "Audio follows video",
+                        "description": "Cutting to this source un-mutes it.",
+                        "default": true
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Audio delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Lip-sync correction, on top of the source's alignment delay."
+                      },
+                      "highPass": {
+                        "type": "object",
+                        "title": "High-pass filter",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "frequencyHz": {
+                            "type": "number",
+                            "title": "Frequency (Hz)",
+                            "minimum": 20,
+                            "maximum": 500,
+                            "default": 80,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "gate": {
+                        "type": "object",
+                        "title": "Noise gate",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -60,
+                            "maximum": 0,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "rangeDb": {
+                            "type": "number",
+                            "title": "Range (dB)",
+                            "minimum": -80,
+                            "maximum": -20,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.01,
+                            "maximum": 10,
+                            "default": 5,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 500,
+                            "default": 100,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "holdMs": {
+                            "type": "number",
+                            "title": "Hold (ms)",
+                            "minimum": 0,
+                            "maximum": 500,
+                            "default": 50,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "eq": {
+                        "type": "object",
+                        "title": "Equaliser",
+                        "properties": {
+                          "low": {
+                            "type": "object",
+                            "title": "Low shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 100,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "mid": {
+                            "type": "object",
+                            "title": "Mid peak",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 1000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "high": {
+                            "type": "object",
+                            "title": "High shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 8000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "compressor": {
+                        "type": "object",
+                        "title": "Compressor",
+                        "properties": {
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -40,
+                            "maximum": 0,
+                            "default": 0
+                          },
+                          "ratio": {
+                            "type": "number",
+                            "title": "Ratio",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 1,
+                            "description": "1 = off."
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.1,
+                            "maximum": 100,
+                            "default": 5
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 1000,
+                            "default": 100
+                          },
+                          "makeupGainDb": {
+                            "type": "number",
+                            "title": "Make-up gain (dB)",
+                            "minimum": 0,
+                            "maximum": 24,
+                            "default": 0
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "key": {
+                    "type": "object",
+                    "title": "Upstream key",
+                    "x-audience": "function",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Key",
+                        "enum": [
+                          "off",
+                          "chroma",
+                          "luma",
+                          "neural"
+                        ],
+                        "default": "off"
+                      },
+                      "keyColorY": {
+                        "type": "integer",
+                        "title": "Key colour Y",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 145,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCb": {
+                        "type": "integer",
+                        "title": "Key colour Cb",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 54,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCr": {
+                        "type": "integer",
+                        "title": "Key colour Cr",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 34,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "similarity": {
+                        "type": "number",
+                        "title": "Similarity",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "smoothness": {
+                        "type": "number",
+                        "title": "Smoothness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "spillSuppress": {
+                        "type": "number",
+                        "title": "Spill suppression",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.5,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "lowClip": {
+                        "type": "number",
+                        "title": "Low clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "highClip": {
+                        "type": "number",
+                        "title": "High clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "softness": {
+                        "type": "number",
+                        "title": "Softness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "fillSource": {
+                        "type": "string",
+                        "title": "Fill source",
+                        "description": "Label of the source giving the fill; empty = this source.",
+                        "x-when": {
+                          "type": [
+                            "chroma",
+                            "luma",
+                            "neural"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "network": {
+                    "type": "object",
+                    "title": "Network constraints",
+                    "x-audience": "orchestrator",
+                    "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+                    "properties": {
+                      "exposure": {
+                        "type": "string",
+                        "title": "Exposure",
+                        "enum": [
+                          "wan-facing",
+                          "internal"
+                        ],
+                        "default": "wan-facing"
+                      },
+                      "pathA": {
+                        "type": "object",
+                        "title": "Network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "srt-src.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A network"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-when": {
+                          "srt-src.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "description": "Should be independent of path A (e.g. a different network or zone)."
+                      }
+                    }
+                  },
+                  "payload": {
+                    "type": "object",
+                    "title": "Expected payload",
+                    "description": "What the incoming stream carries, per path. The receiver decodes and normalizes it to the output format below; the orchestrator uses the bitrate to reserve bandwidth.",
+                    "properties": {
+                      "pathA": {
+                        "type": "object",
+                        "title": "Stream",
+                        "x-group": "paths",
+                        "required": [
+                          "bitrateMbps"
+                        ],
+                        "properties": {
+                          "bitrateMbps": {
+                            "type": "number",
+                            "title": "Bitrate (Mbit/s)",
+                            "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                            "minimum": 0.1,
+                            "maximum": 10000
+                          },
+                          "container": {
+                            "type": "string",
+                            "title": "Container",
+                            "enum": [
+                              "mpeg-ts",
+                              "rtp",
+                              "flv"
+                            ],
+                            "default": "mpeg-ts"
+                          },
+                          "videoCodec": {
+                            "type": "string",
+                            "title": "Video codec",
+                            "enum": [
+                              "h264",
+                              "hevc",
+                              "jpeg-xs",
+                              "jpeg2000",
+                              "av1",
+                              "uncompressed"
+                            ],
+                            "default": "h264"
+                          },
+                          "audioCodec": {
+                            "type": "string",
+                            "title": "Audio codec",
+                            "enum": [
+                              "aac",
+                              "mpeg-l2",
+                              "ac3",
+                              "eac3",
+                              "opus",
+                              "pcm"
+                            ],
+                            "default": "aac"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "srt-src.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B",
+                        "x-group": "paths",
+                        "required": [
+                          "bitrateMbps"
+                        ],
+                        "properties": {
+                          "bitrateMbps": {
+                            "type": "number",
+                            "title": "Bitrate (Mbit/s)",
+                            "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                            "minimum": 0.1,
+                            "maximum": 10000
+                          },
+                          "container": {
+                            "type": "string",
+                            "title": "Container",
+                            "enum": [
+                              "mpeg-ts",
+                              "rtp",
+                              "flv"
+                            ],
+                            "default": "mpeg-ts"
+                          },
+                          "videoCodec": {
+                            "type": "string",
+                            "title": "Video codec",
+                            "enum": [
+                              "h264",
+                              "hevc",
+                              "jpeg-xs",
+                              "jpeg2000",
+                              "av1",
+                              "uncompressed"
+                            ],
+                            "default": "h264"
+                          },
+                          "audioCodec": {
+                            "type": "string",
+                            "title": "Audio codec",
+                            "enum": [
+                              "aac",
+                              "mpeg-l2",
+                              "ac3",
+                              "eac3",
+                              "opus",
+                              "pcm"
+                            ],
+                            "default": "aac"
+                          }
+                        },
+                        "x-when": {
+                          "srt-src.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        }
+                      }
+                    },
+                    "x-audience": "both"
+                  }
+                }
+              },
+              "moq-src": {
+                "type": "object",
+                "title": "MoQ source · moq-src",
+                "properties": {
+                  "moq": {
+                    "type": "object",
+                    "title": "MoQ source",
+                    "x-audience": "function",
+                    "required": [
+                      "streamName"
+                    ],
+                    "properties": {
+                      "streamName": {
+                        "type": "string",
+                        "title": "Stream name",
+                        "description": "Name the source publishes under."
+                      }
+                    }
+                  },
+                  "source": {
+                    "type": "object",
+                    "title": "Source",
+                    "x-audience": "function",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Shown on the multiview (max 64 characters)."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "title": "Multiview position",
+                        "minimum": 1,
+                        "maximum": 64,
+                        "description": "Order on the multiview; empty = in the order sources are added."
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Alignment delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Delays this source's video and audio to line it up with the others."
+                      }
+                    }
+                  },
+                  "audio": {
+                    "type": "object",
+                    "title": "Audio channel",
+                    "x-audience": "function",
+                    "properties": {
+                      "trimDb": {
+                        "type": "number",
+                        "title": "Input trim (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0
+                      },
+                      "afv": {
+                        "type": "boolean",
+                        "title": "Audio follows video",
+                        "description": "Cutting to this source un-mutes it.",
+                        "default": true
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Audio delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Lip-sync correction, on top of the source's alignment delay."
+                      },
+                      "highPass": {
+                        "type": "object",
+                        "title": "High-pass filter",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "frequencyHz": {
+                            "type": "number",
+                            "title": "Frequency (Hz)",
+                            "minimum": 20,
+                            "maximum": 500,
+                            "default": 80,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "gate": {
+                        "type": "object",
+                        "title": "Noise gate",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -60,
+                            "maximum": 0,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "rangeDb": {
+                            "type": "number",
+                            "title": "Range (dB)",
+                            "minimum": -80,
+                            "maximum": -20,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.01,
+                            "maximum": 10,
+                            "default": 5,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 500,
+                            "default": 100,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "holdMs": {
+                            "type": "number",
+                            "title": "Hold (ms)",
+                            "minimum": 0,
+                            "maximum": 500,
+                            "default": 50,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "eq": {
+                        "type": "object",
+                        "title": "Equaliser",
+                        "properties": {
+                          "low": {
+                            "type": "object",
+                            "title": "Low shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 100,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "mid": {
+                            "type": "object",
+                            "title": "Mid peak",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 1000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "high": {
+                            "type": "object",
+                            "title": "High shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 8000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "compressor": {
+                        "type": "object",
+                        "title": "Compressor",
+                        "properties": {
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -40,
+                            "maximum": 0,
+                            "default": 0
+                          },
+                          "ratio": {
+                            "type": "number",
+                            "title": "Ratio",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 1,
+                            "description": "1 = off."
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.1,
+                            "maximum": 100,
+                            "default": 5
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 1000,
+                            "default": 100
+                          },
+                          "makeupGainDb": {
+                            "type": "number",
+                            "title": "Make-up gain (dB)",
+                            "minimum": 0,
+                            "maximum": 24,
+                            "default": 0
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "key": {
+                    "type": "object",
+                    "title": "Upstream key",
+                    "x-audience": "function",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Key",
+                        "enum": [
+                          "off",
+                          "chroma",
+                          "luma",
+                          "neural"
+                        ],
+                        "default": "off"
+                      },
+                      "keyColorY": {
+                        "type": "integer",
+                        "title": "Key colour Y",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 145,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCb": {
+                        "type": "integer",
+                        "title": "Key colour Cb",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 54,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCr": {
+                        "type": "integer",
+                        "title": "Key colour Cr",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 34,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "similarity": {
+                        "type": "number",
+                        "title": "Similarity",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "smoothness": {
+                        "type": "number",
+                        "title": "Smoothness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "spillSuppress": {
+                        "type": "number",
+                        "title": "Spill suppression",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.5,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "lowClip": {
+                        "type": "number",
+                        "title": "Low clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "highClip": {
+                        "type": "number",
+                        "title": "High clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "softness": {
+                        "type": "number",
+                        "title": "Softness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "fillSource": {
+                        "type": "string",
+                        "title": "Fill source",
+                        "description": "Label of the source giving the fill; empty = this source.",
+                        "x-when": {
+                          "type": [
+                            "chroma",
+                            "luma",
+                            "neural"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "network": {
+                    "type": "object",
+                    "title": "Network constraints",
+                    "x-audience": "orchestrator",
+                    "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+                    "properties": {
+                      "exposure": {
+                        "type": "string",
+                        "title": "Exposure",
+                        "enum": [
+                          "wan-facing",
+                          "internal"
+                        ],
+                        "default": "wan-facing"
+                      },
+                      "pathA": {
+                        "type": "object",
+                        "title": "Network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "moq-src.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A network"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-when": {
+                          "moq-src.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "description": "Should be independent of path A (e.g. a different network or zone)."
+                      }
+                    }
+                  },
+                  "payload": {
+                    "type": "object",
+                    "title": "Expected payload",
+                    "description": "What the incoming stream carries, per path. The receiver decodes and normalizes it to the output format below; the orchestrator uses the bitrate to reserve bandwidth.",
+                    "properties": {
+                      "pathA": {
+                        "type": "object",
+                        "title": "Stream",
+                        "x-group": "paths",
+                        "required": [
+                          "bitrateMbps"
+                        ],
+                        "properties": {
+                          "bitrateMbps": {
+                            "type": "number",
+                            "title": "Bitrate (Mbit/s)",
+                            "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                            "minimum": 0.1,
+                            "maximum": 10000
+                          },
+                          "container": {
+                            "type": "string",
+                            "title": "Container",
+                            "enum": [
+                              "mpeg-ts",
+                              "rtp",
+                              "flv"
+                            ],
+                            "default": "mpeg-ts"
+                          },
+                          "videoCodec": {
+                            "type": "string",
+                            "title": "Video codec",
+                            "enum": [
+                              "h264",
+                              "hevc",
+                              "jpeg-xs",
+                              "jpeg2000",
+                              "av1",
+                              "uncompressed"
+                            ],
+                            "default": "h264"
+                          },
+                          "audioCodec": {
+                            "type": "string",
+                            "title": "Audio codec",
+                            "enum": [
+                              "aac",
+                              "mpeg-l2",
+                              "ac3",
+                              "eac3",
+                              "opus",
+                              "pcm"
+                            ],
+                            "default": "aac"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "moq-src.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B",
+                        "x-group": "paths",
+                        "required": [
+                          "bitrateMbps"
+                        ],
+                        "properties": {
+                          "bitrateMbps": {
+                            "type": "number",
+                            "title": "Bitrate (Mbit/s)",
+                            "description": "Bitrate of the incoming stream (including audio and container overhead). Sizes SRT buffers/overhead and the orchestrator's bandwidth reservation.",
+                            "minimum": 0.1,
+                            "maximum": 10000
+                          },
+                          "container": {
+                            "type": "string",
+                            "title": "Container",
+                            "enum": [
+                              "mpeg-ts",
+                              "rtp",
+                              "flv"
+                            ],
+                            "default": "mpeg-ts"
+                          },
+                          "videoCodec": {
+                            "type": "string",
+                            "title": "Video codec",
+                            "enum": [
+                              "h264",
+                              "hevc",
+                              "jpeg-xs",
+                              "jpeg2000",
+                              "av1",
+                              "uncompressed"
+                            ],
+                            "default": "h264"
+                          },
+                          "audioCodec": {
+                            "type": "string",
+                            "title": "Audio codec",
+                            "enum": [
+                              "aac",
+                              "mpeg-l2",
+                              "ac3",
+                              "eac3",
+                              "opus",
+                              "pcm"
+                            ],
+                            "default": "aac"
+                          }
+                        },
+                        "x-when": {
+                          "moq-src.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        }
+                      }
+                    },
+                    "x-audience": "both"
+                  }
+                }
+              },
+              "mxl-src": {
+                "type": "object",
+                "title": "MXL source · mxl-src",
+                "properties": {
+                  "source": {
+                    "type": "object",
+                    "title": "Source",
+                    "x-audience": "function",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Shown on the multiview (max 64 characters)."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "title": "Multiview position",
+                        "minimum": 1,
+                        "maximum": 64,
+                        "description": "Order on the multiview; empty = in the order sources are added."
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Alignment delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Delays this source's video and audio to line it up with the others."
+                      }
+                    }
+                  },
+                  "audio": {
+                    "type": "object",
+                    "title": "Audio channel",
+                    "x-audience": "function",
+                    "properties": {
+                      "trimDb": {
+                        "type": "number",
+                        "title": "Input trim (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0
+                      },
+                      "afv": {
+                        "type": "boolean",
+                        "title": "Audio follows video",
+                        "description": "Cutting to this source un-mutes it.",
+                        "default": true
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Audio delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Lip-sync correction, on top of the source's alignment delay."
+                      },
+                      "highPass": {
+                        "type": "object",
+                        "title": "High-pass filter",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "frequencyHz": {
+                            "type": "number",
+                            "title": "Frequency (Hz)",
+                            "minimum": 20,
+                            "maximum": 500,
+                            "default": 80,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "gate": {
+                        "type": "object",
+                        "title": "Noise gate",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -60,
+                            "maximum": 0,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "rangeDb": {
+                            "type": "number",
+                            "title": "Range (dB)",
+                            "minimum": -80,
+                            "maximum": -20,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.01,
+                            "maximum": 10,
+                            "default": 5,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 500,
+                            "default": 100,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "holdMs": {
+                            "type": "number",
+                            "title": "Hold (ms)",
+                            "minimum": 0,
+                            "maximum": 500,
+                            "default": 50,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "eq": {
+                        "type": "object",
+                        "title": "Equaliser",
+                        "properties": {
+                          "low": {
+                            "type": "object",
+                            "title": "Low shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 100,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "mid": {
+                            "type": "object",
+                            "title": "Mid peak",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 1000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "high": {
+                            "type": "object",
+                            "title": "High shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 8000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "compressor": {
+                        "type": "object",
+                        "title": "Compressor",
+                        "properties": {
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -40,
+                            "maximum": 0,
+                            "default": 0
+                          },
+                          "ratio": {
+                            "type": "number",
+                            "title": "Ratio",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 1,
+                            "description": "1 = off."
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.1,
+                            "maximum": 100,
+                            "default": 5
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 1000,
+                            "default": 100
+                          },
+                          "makeupGainDb": {
+                            "type": "number",
+                            "title": "Make-up gain (dB)",
+                            "minimum": 0,
+                            "maximum": 24,
+                            "default": 0
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "key": {
+                    "type": "object",
+                    "title": "Upstream key",
+                    "x-audience": "function",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Key",
+                        "enum": [
+                          "off",
+                          "chroma",
+                          "luma",
+                          "neural"
+                        ],
+                        "default": "off"
+                      },
+                      "keyColorY": {
+                        "type": "integer",
+                        "title": "Key colour Y",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 145,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCb": {
+                        "type": "integer",
+                        "title": "Key colour Cb",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 54,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCr": {
+                        "type": "integer",
+                        "title": "Key colour Cr",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 34,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "similarity": {
+                        "type": "number",
+                        "title": "Similarity",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "smoothness": {
+                        "type": "number",
+                        "title": "Smoothness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "spillSuppress": {
+                        "type": "number",
+                        "title": "Spill suppression",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.5,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "lowClip": {
+                        "type": "number",
+                        "title": "Low clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "highClip": {
+                        "type": "number",
+                        "title": "High clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "softness": {
+                        "type": "number",
+                        "title": "Softness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "fillSource": {
+                        "type": "string",
+                        "title": "Fill source",
+                        "description": "Label of the source giving the fill; empty = this source.",
+                        "x-when": {
+                          "type": [
+                            "chroma",
+                            "luma",
+                            "neural"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "st2110-src": {
+                "type": "object",
+                "title": "ST 2110 receiver · st2110-src",
+                "properties": {
+                  "source": {
+                    "type": "object",
+                    "title": "Source",
+                    "x-audience": "function",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "title": "Label",
+                        "description": "Shown on the multiview (max 64 characters)."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "title": "Multiview position",
+                        "minimum": 1,
+                        "maximum": 64,
+                        "description": "Order on the multiview; empty = in the order sources are added."
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Alignment delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Delays this source's video and audio to line it up with the others."
+                      }
+                    }
+                  },
+                  "audio": {
+                    "type": "object",
+                    "title": "Audio channel",
+                    "x-audience": "function",
+                    "properties": {
+                      "trimDb": {
+                        "type": "number",
+                        "title": "Input trim (dB)",
+                        "minimum": -20,
+                        "maximum": 20,
+                        "default": 0
+                      },
+                      "afv": {
+                        "type": "boolean",
+                        "title": "Audio follows video",
+                        "description": "Cutting to this source un-mutes it.",
+                        "default": true
+                      },
+                      "delayMs": {
+                        "type": "integer",
+                        "title": "Audio delay (ms)",
+                        "minimum": 0,
+                        "maximum": 500,
+                        "default": 0,
+                        "description": "Lip-sync correction, on top of the source's alignment delay."
+                      },
+                      "highPass": {
+                        "type": "object",
+                        "title": "High-pass filter",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "frequencyHz": {
+                            "type": "number",
+                            "title": "Frequency (Hz)",
+                            "minimum": 20,
+                            "maximum": 500,
+                            "default": 80,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "gate": {
+                        "type": "object",
+                        "title": "Noise gate",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "title": "On",
+                            "default": false
+                          },
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -60,
+                            "maximum": 0,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "rangeDb": {
+                            "type": "number",
+                            "title": "Range (dB)",
+                            "minimum": -80,
+                            "maximum": -20,
+                            "default": -40,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.01,
+                            "maximum": 10,
+                            "default": 5,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 500,
+                            "default": 100,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          },
+                          "holdMs": {
+                            "type": "number",
+                            "title": "Hold (ms)",
+                            "minimum": 0,
+                            "maximum": 500,
+                            "default": 50,
+                            "x-when": {
+                              "enabled": [
+                                true
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "eq": {
+                        "type": "object",
+                        "title": "Equaliser",
+                        "properties": {
+                          "low": {
+                            "type": "object",
+                            "title": "Low shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 100,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "mid": {
+                            "type": "object",
+                            "title": "Mid peak",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 1000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "high": {
+                            "type": "object",
+                            "title": "High shelf",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean",
+                                "title": "On",
+                                "default": false
+                              },
+                              "frequencyHz": {
+                                "type": "number",
+                                "title": "Frequency (Hz)",
+                                "minimum": 20,
+                                "maximum": 20000,
+                                "default": 8000,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "gainDb": {
+                                "type": "number",
+                                "title": "Gain (dB)",
+                                "minimum": -20,
+                                "maximum": 20,
+                                "default": 0,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "q": {
+                                "type": "number",
+                                "title": "Q",
+                                "minimum": 0.1,
+                                "maximum": 20,
+                                "default": 0.7,
+                                "x-when": {
+                                  "enabled": [
+                                    true
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "compressor": {
+                        "type": "object",
+                        "title": "Compressor",
+                        "properties": {
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -40,
+                            "maximum": 0,
+                            "default": 0
+                          },
+                          "ratio": {
+                            "type": "number",
+                            "title": "Ratio",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 1,
+                            "description": "1 = off."
+                          },
+                          "attackMs": {
+                            "type": "number",
+                            "title": "Attack (ms)",
+                            "minimum": 0.1,
+                            "maximum": 100,
+                            "default": 5
+                          },
+                          "releaseMs": {
+                            "type": "number",
+                            "title": "Release (ms)",
+                            "minimum": 10,
+                            "maximum": 1000,
+                            "default": 100
+                          },
+                          "makeupGainDb": {
+                            "type": "number",
+                            "title": "Make-up gain (dB)",
+                            "minimum": 0,
+                            "maximum": 24,
+                            "default": 0
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "key": {
+                    "type": "object",
+                    "title": "Upstream key",
+                    "x-audience": "function",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Key",
+                        "enum": [
+                          "off",
+                          "chroma",
+                          "luma",
+                          "neural"
+                        ],
+                        "default": "off"
+                      },
+                      "keyColorY": {
+                        "type": "integer",
+                        "title": "Key colour Y",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 145,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCb": {
+                        "type": "integer",
+                        "title": "Key colour Cb",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 54,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "keyColorCr": {
+                        "type": "integer",
+                        "title": "Key colour Cr",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "default": 34,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "similarity": {
+                        "type": "number",
+                        "title": "Similarity",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.4,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "smoothness": {
+                        "type": "number",
+                        "title": "Smoothness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "spillSuppress": {
+                        "type": "number",
+                        "title": "Spill suppression",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.5,
+                        "x-when": {
+                          "type": [
+                            "chroma"
+                          ]
+                        }
+                      },
+                      "lowClip": {
+                        "type": "number",
+                        "title": "Low clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "highClip": {
+                        "type": "number",
+                        "title": "High clip",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "softness": {
+                        "type": "number",
+                        "title": "Softness",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "default": 0.1,
+                        "x-when": {
+                          "type": [
+                            "luma"
+                          ]
+                        }
+                      },
+                      "fillSource": {
+                        "type": "string",
+                        "title": "Fill source",
+                        "description": "Label of the source giving the fill; empty = this source.",
+                        "x-when": {
+                          "type": [
+                            "chroma",
+                            "luma",
+                            "neural"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "network": {
+                    "type": "object",
+                    "title": "Network constraints",
+                    "x-audience": "orchestrator",
+                    "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+                    "properties": {
+                      "exposure": {
+                        "type": "string",
+                        "title": "Exposure",
+                        "enum": [
+                          "wan-facing",
+                          "internal"
+                        ],
+                        "default": "wan-facing"
+                      },
+                      "pathA": {
+                        "type": "object",
+                        "title": "Network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "st2110-src.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A network"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-when": {
+                          "st2110-src.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "description": "Should be independent of path A (e.g. a different network or zone)."
+                      }
+                    }
+                  }
+                }
+              },
+              "engine": {
+                "type": "object",
+                "title": "Switching engine · engine",
+                "properties": {
+                  "engine": {
+                    "type": "object",
+                    "title": "Programme format & timing",
+                    "x-audience": "function",
+                    "required": [
+                      "resolution",
+                      "rate"
+                    ],
+                    "properties": {
+                      "resolution": {
+                        "type": "string",
+                        "title": "Resolution",
+                        "enum": [
+                          "1280x720",
+                          "1920x1080",
+                          "3840x2160"
+                        ],
+                        "default": "1920x1080",
+                        "x-flow": "frameSize"
+                      },
+                      "rate": {
+                        "type": "string",
+                        "title": "Frame rate",
+                        "enum": [
+                          "23.976",
+                          "24",
+                          "25",
+                          "29.97",
+                          "30",
+                          "50",
+                          "59.94",
+                          "60"
+                        ],
+                        "default": "29.97",
+                        "x-flow": "grainRate",
+                        "description": "23.976 and 24 exist only at 1080."
+                      },
+                      "scan": {
+                        "type": "string",
+                        "title": "Scan",
+                        "enum": [
+                          "progressive"
+                        ],
+                        "default": "progressive",
+                        "x-flow": "interlace"
+                      },
+                      "colorProfile": {
+                        "type": "string",
+                        "title": "Colour profile",
+                        "enum": [
+                          "standard",
+                          "standard-hevc",
+                          "professional"
+                        ],
+                        "default": "standard",
+                        "description": "standard: 8-bit 4:2:0 H.264; standard-hevc: 8-bit HEVC; professional: 10-bit 4:2:2."
+                      },
+                      "colorspace": {
+                        "type": "string",
+                        "title": "Colorspace",
+                        "enum": [
+                          "BT709"
+                        ],
+                        "default": "BT709",
+                        "x-flow": "colorspace"
+                      },
+                      "frameSync": {
+                        "type": "string",
+                        "title": "Frame synchronizer",
+                        "enum": [
+                          "off",
+                          "freerun",
+                          "source-driven"
+                        ],
+                        "default": "off",
+                        "description": "freerun: smooth output on its own clock; source-driven: lower latency."
+                      },
+                      "frameRateConversion": {
+                        "type": "string",
+                        "title": "Frame-rate conversion",
+                        "enum": [
+                          "none",
+                          "nearest",
+                          "blend",
+                          "mcfi"
+                        ],
+                        "default": "none",
+                        "description": "For sources at another rate; mcfi = motion-compensated."
+                      }
+                    }
+                  }
+                }
+              },
+              "audio": {
+                "type": "object",
+                "title": "Audio mixer · audio",
+                "properties": {
+                  "master": {
+                    "type": "object",
+                    "title": "Master bus",
+                    "x-audience": "function",
+                    "properties": {
+                      "limiter": {
+                        "type": "object",
+                        "title": "Limiter",
+                        "properties": {
+                          "thresholdDb": {
+                            "type": "number",
+                            "title": "Threshold (dB)",
+                            "minimum": -24,
+                            "maximum": 0,
+                            "default": -3
+                          },
+                          "ceilingDb": {
+                            "type": "number",
+                            "title": "Ceiling (dB)",
+                            "minimum": -12,
+                            "maximum": 0,
+                            "default": -1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "encoder": {
+                "type": "object",
+                "title": "Program encoder · encoder",
+                "properties": {
+                  "encoder": {
+                    "type": "object",
+                    "title": "Programme encoding",
+                    "x-audience": "function",
+                    "properties": {
+                      "bitrateMbps": {
+                        "type": "number",
+                        "title": "Bitrate (Mbit/s)",
+                        "description": "0 = automatic from the resolution.",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "gopSeconds": {
+                        "type": "integer",
+                        "title": "Keyframe interval (s)",
+                        "enum": [
+                          1,
+                          2,
+                          4
+                        ],
+                        "default": 2
+                      },
+                      "preset": {
+                        "type": "string",
+                        "title": "Encoder preset",
+                        "enum": [
+                          "low-latency",
+                          "balanced",
+                          "quality"
+                        ],
+                        "default": "balanced"
+                      },
+                      "timecode": {
+                        "type": "boolean",
+                        "title": "Insert SMPTE timecode",
+                        "default": false
+                      }
+                    }
+                  }
+                }
+              },
+              "captions": {
+                "type": "object",
+                "title": "Closed captions · captions",
+                "properties": {
+                  "captions": {
+                    "type": "object",
+                    "title": "Captions",
+                    "x-audience": "function",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "title": "Mode",
+                        "enum": [
+                          "off",
+                          "passthrough",
+                          "author"
+                        ],
+                        "default": "passthrough",
+                        "description": "passthrough: keep the selected source's captions; author: typed live or from speech-to-text."
+                      }
+                    }
+                  },
+                  "asr": {
+                    "type": "object",
+                    "title": "Speech-to-text",
+                    "x-audience": "function",
+                    "properties": {
+                      "backend": {
+                        "type": "string",
+                        "title": "Engine",
+                        "enum": [
+                          "parakeet",
+                          "whisper"
+                        ],
+                        "default": "parakeet"
+                      },
+                      "model": {
+                        "type": "string",
+                        "title": "Model",
+                        "description": "e.g. large-v3-turbo (Whisper); empty = the engine's default."
+                      },
+                      "confidence": {
+                        "type": "string",
+                        "title": "Confidence filter",
+                        "enum": [
+                          "off",
+                          "low",
+                          "medium",
+                          "high"
+                        ],
+                        "default": "medium"
+                      },
+                      "speakerDetection": {
+                        "type": "boolean",
+                        "title": "Speaker detection",
+                        "default": false
+                      }
+                    }
+                  }
+                }
+              },
+              "scte35": {
+                "type": "object",
+                "title": "SCTE-35 ad insertion · scte35",
+                "properties": {
+                  "scte35": {
+                    "type": "object",
+                    "title": "SCTE-35",
+                    "x-audience": "function",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "title": "Insert SCTE-35",
+                        "default": true
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "title": "PID",
+                        "minimum": 32,
+                        "maximum": 8190,
+                        "default": 258,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "prerollMs": {
+                        "type": "integer",
+                        "title": "Pre-roll (ms)",
+                        "minimum": 0,
+                        "maximum": 60000,
+                        "default": 4000,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "heartbeatMs": {
+                        "type": "integer",
+                        "title": "Heartbeat (ms)",
+                        "description": "splice_null interval; 0 = off.",
+                        "minimum": 0,
+                        "maximum": 60000,
+                        "default": 5000,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "verify": {
+                        "type": "boolean",
+                        "title": "Verify each cue",
+                        "default": true,
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "webhookUrl": {
+                        "type": "string",
+                        "title": "Event webhook URL",
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        }
+                      },
+                      "defaultRule": {
+                        "type": "string",
+                        "title": "When no rule matches",
+                        "enum": [
+                          "pass",
+                          "drop",
+                          "rewrite"
+                        ],
+                        "default": "pass",
+                        "x-when": {
+                          "enabled": [
+                            true
+                          ]
+                        },
+                        "description": "Signal conditioning default action."
+                      }
+                    }
+                  }
+                }
+              },
+              "replay": {
+                "type": "object",
+                "title": "Instant replay · replay",
+                "properties": {
+                  "replay": {
+                    "type": "object",
+                    "title": "Replay",
+                    "x-audience": "function",
+                    "properties": {
+                      "bufferSeconds": {
+                        "type": "integer",
+                        "title": "Buffer per source (s)",
+                        "minimum": 1,
+                        "maximum": 300,
+                        "default": 300
+                      },
+                      "shutterAngle": {
+                        "type": "integer",
+                        "title": "Slow-motion shutter angle (°)",
+                        "minimum": 0,
+                        "maximum": 360,
+                        "default": 180,
+                        "description": "Motion blur on slow motion; higher = more blur."
+                      }
+                    }
+                  }
+                }
+              },
+              "clips": {
+                "type": "object",
+                "title": "Clip players · clips",
+                "properties": {
+                  "clips": {
+                    "type": "object",
+                    "title": "Clip library",
+                    "x-audience": "function",
+                    "properties": {
+                      "storageMaxGB": {
+                        "type": "integer",
+                        "title": "Library size limit (GB)",
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "default": 10
+                      },
+                      "ephemeralTtlHours": {
+                        "type": "integer",
+                        "title": "Keep temporary clips (h)",
+                        "minimum": 1,
+                        "maximum": 720,
+                        "default": 24
+                      }
+                    }
+                  }
+                }
+              },
+              "playout": {
+                "type": "object",
+                "title": "Playout channels · playout",
+                "properties": {
+                  "playout": {
+                    "type": "object",
+                    "title": "Playout",
+                    "x-audience": "function",
+                    "properties": {
+                      "cacheMaxGB": {
+                        "type": "integer",
+                        "title": "Asset cache limit (GB)",
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "default": 200
+                      },
+                      "asRunRetentionDays": {
+                        "type": "integer",
+                        "title": "Keep as-run logs (days)",
+                        "minimum": 1,
+                        "maximum": 3650,
+                        "default": 30
+                      }
+                    }
+                  }
+                }
+              },
+              "control": {
+                "type": "object",
+                "title": "Control room · control",
+                "properties": {
+                  "control": {
+                    "type": "object",
+                    "title": "Control room",
+                    "x-audience": "function",
+                    "properties": {
+                      "previewProxy": {
+                        "type": "boolean",
+                        "title": "Low-bitrate source previews",
+                        "description": "Cuts browser bandwidth (about 55 → 10 Mbit/s).",
+                        "default": true
+                      },
+                      "previewResolution": {
+                        "type": "string",
+                        "title": "Preview resolution",
+                        "enum": [
+                          "360p",
+                          "480p",
+                          "720p"
+                        ],
+                        "default": "480p",
+                        "x-when": {
+                          "previewProxy": [
+                            true
+                          ]
+                        }
+                      },
+                      "previewBitrateKbps": {
+                        "type": "integer",
+                        "title": "Preview bitrate (kbit/s)",
+                        "minimum": 100,
+                        "maximum": 5000,
+                        "default": 500,
+                        "x-when": {
+                          "previewProxy": [
+                            true
+                          ]
+                        }
+                      },
+                      "relayResolution": {
+                        "type": "string",
+                        "title": "Source relay resolution",
+                        "enum": [
+                          "360p",
+                          "480p",
+                          "720p",
+                          "source"
+                        ],
+                        "default": "720p"
+                      },
+                      "relayBitrateKbps": {
+                        "type": "integer",
+                        "title": "Source relay bitrate (kbit/s)",
+                        "minimum": 100,
+                        "maximum": 50000,
+                        "default": 2000
+                      },
+                      "allowedOrigins": {
+                        "type": "string",
+                        "title": "Allowed browser origins",
+                        "description": "Comma-separated; empty = any."
+                      },
+                      "access": {
+                        "type": "object",
+                        "title": "Access",
+                        "properties": {
+                          "apiToken": {
+                            "type": "string",
+                            "title": "API token",
+                            "format": "secret-ref",
+                            "description": "Empty: one is generated at start."
+                          },
+                          "directorInvite": {
+                            "type": "string",
+                            "title": "Director invite token",
+                            "format": "secret-ref"
+                          },
+                          "audioInvite": {
+                            "type": "string",
+                            "title": "Audio operator invite token",
+                            "format": "secret-ref"
+                          },
+                          "graphicsInvite": {
+                            "type": "string",
+                            "title": "Graphics operator invite token",
+                            "format": "secret-ref"
+                          },
+                          "viewerInvite": {
+                            "type": "string",
+                            "title": "Viewer invite token",
+                            "format": "secret-ref"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "network": {
+                    "type": "object",
+                    "title": "Network constraints",
+                    "x-audience": "orchestrator",
+                    "description": "Lets the orchestrator place, size, deploy and connect the receiver correctly (recommended).",
+                    "properties": {
+                      "exposure": {
+                        "type": "string",
+                        "title": "Exposure",
+                        "enum": [
+                          "wan-facing",
+                          "internal"
+                        ],
+                        "default": "wan-facing"
+                      },
+                      "pathA": {
+                        "type": "object",
+                        "title": "Network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-title-when": [
+                          {
+                            "when": {
+                              "control.srt.bonding": [
+                                "broadcast",
+                                "main-backup"
+                              ]
+                            },
+                            "title": "Path A network"
+                          }
+                        ]
+                      },
+                      "pathB": {
+                        "type": "object",
+                        "title": "Path B network",
+                        "x-group": "paths",
+                        "properties": {
+                          "network": {
+                            "type": "string",
+                            "title": "Network",
+                            "description": "Logical network the stream arrives on, e.g. contribution."
+                          },
+                          "zone": {
+                            "type": "string",
+                            "title": "Preferred zone"
+                          },
+                          "vlan": {
+                            "type": "string",
+                            "title": "Preferred VLAN / segment"
+                          }
+                        },
+                        "x-when": {
+                          "control.srt.bonding": [
+                            "broadcast",
+                            "main-backup"
+                          ]
+                        },
+                        "description": "Should be independent of path A (e.g. a different network or zone)."
+                      }
+                    }
+                  }
+                }
+              },
+              "srt-out": {
+                "type": "object",
+                "title": "SRT program output · srt-out",
+                "properties": {
+                  "srt": {
+                    "type": "object",
+                    "title": "SRT destination",
+                    "x-audience": "function",
+                    "required": [
+                      "mode",
+                      "address",
+                      "port",
+                      "latencyMs",
+                      "passphrase"
+                    ],
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "title": "Mode",
+                        "enum": [
+                          "caller",
+                          "listener"
+                        ],
+                        "default": "caller",
+                        "description": "Caller: we push to the destination. Listener: the destination pulls from us."
+                      },
+                      "address": {
+                        "type": "string",
+                        "title": "Destination host",
+                        "x-when": {
+                          "mode": [
+                            "caller"
+                          ]
+                        }
+                      },
+                      "port": {
+                        "type": "integer",
+                        "title": "Destination port",
+                        "minimum": 1,
+                        "maximum": 65535,
+                        "x-when": {
+                          "mode": [
+                            "caller"
+                          ]
+                        }
+                      },
+                      "streamId": {
+                        "type": "string",
+                        "title": "Stream ID"
+                      },
+                      "latencyMs": {
+                        "type": "integer",
+                        "title": "Latency (ms)",
+                        "minimum": 20,
+                        "maximum": 8000,
+                        "default": 120
+                      },
+                      "encryption": {
+                        "type": "string",
+                        "title": "Encryption",
+                        "enum": [
+                          "off",
+                          "aes-128",
+                          "aes-256"
+                        ],
+                        "default": "off"
+                      },
+                      "passphrase": {
+                        "type": "string",
+                        "title": "Passphrase",
+                        "format": "secret-ref",
+                        "x-when": {
+                          "encryption": [
+                            "aes-128",
+                            "aes-256"
+                          ]
+                        }
+                      },
+                      "maxBandwidthMbps": {
+                        "type": "number",
+                        "title": "Max bandwidth (Mbit/s)",
+                        "description": "0 = unlimited.",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "maxConnections": {
+                        "type": "integer",
+                        "title": "Max connections",
+                        "minimum": 1,
+                        "maximum": 64,
+                        "default": 1,
+                        "x-when": {
+                          "mode": [
+                            "listener"
+                          ]
+                        }
+                      },
+                      "scte35": {
+                        "type": "boolean",
+                        "title": "Pass SCTE-35 cues",
+                        "default": true
+                      }
+                    }
+                  }
+                }
+              },
+              "rtmp-out": {
+                "type": "object",
+                "title": "RTMP program output · rtmp-out",
+                "properties": {
+                  "rtmp": {
+                    "type": "object",
+                    "title": "RTMP destination",
+                    "x-audience": "function",
+                    "required": [
+                      "url"
+                    ],
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "title": "Ingest URL",
+                        "description": "rtmp:// or rtmps:// URL of the ingest."
+                      },
+                      "streamKey": {
+                        "type": "string",
+                        "title": "Stream key",
+                        "format": "secret-ref"
+                      }
+                    }
+                  }
+                }
+              },
+              "recording": {
+                "type": "object",
+                "title": "Program recording · recording",
+                "properties": {
+                  "recording": {
+                    "type": "object",
+                    "title": "Recording",
+                    "x-audience": "function",
+                    "properties": {
+                      "rotateAfterMinutes": {
+                        "type": "integer",
+                        "title": "New file every (min)",
+                        "description": "0 = never rotate on time.",
+                        "minimum": 0,
+                        "maximum": 1440,
+                        "default": 60
+                      },
+                      "maxFileSizeMB": {
+                        "type": "integer",
+                        "title": "Max file size (MB)",
+                        "description": "0 = unlimited.",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "filenamePrefix": {
+                        "type": "string",
+                        "title": "File name prefix",
+                        "default": "program"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

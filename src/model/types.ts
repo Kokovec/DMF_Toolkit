@@ -210,6 +210,7 @@ export type FunctionInstance = {
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
   inputs?: InputSelection // which input blocks this instance uses, and how many copies of each
+  outputs?: OutputSelection // how many copies of each output block this instance runs (0 = off)
   settings?: { [key: string]: JsonValue } // the vendor's own configuration (free-form), passed through unchanged
   control?: ControlSpec
   dependencies?: Dependency[]
@@ -292,6 +293,9 @@ export type FeatureDef = {
     maxPerBlock?: number // add-on: how many times per block
     maxPerModule?: number
     needsAddon?: { group: string; min: number; message: string }[] // block: required add-ons
+    // the module must also have a block matching one of these feature ids ("input.*" patterns),
+    // e.g. SRT program outputs need a program encoder
+    requires?: { anyOf: string[]; message: string }[]
   }
 }
 
@@ -301,13 +305,15 @@ export type ModuleBlock = {
   feature: string
   addons: string[]
   essence?: Essence // blocks with ports: video feed (with its audio/ANC) or audio-only feed
-  scaleOut?: number // input blocks: up to this many copies per instance (default 1)
+  scaleOut?: number // input and output blocks: up to this many copies per instance (default 1)
 }
 
 export type InputRule = 'one' | 'several'
 
 // Copies of each input block an instance uses (block id -> count; 0 = not used).
 export type InputSelection = Record<string, number>
+// Copies of each output block an instance uses (block id -> count; 0 = not used).
+export type OutputSelection = Record<string, number>
 
 // The module's design: the functions it offers (blocks with their add-ons) and module-wide
 // features. No wiring: how functions are used and configured is up to the workload.
@@ -335,7 +341,9 @@ export type FeatureLibrary = {
   spec: {
     vocabulary: Vocabulary
     categories: CategoryDef[]
-    featureGroups: { id: string; name: string; description?: string }[]
+    // Sidebar of the module designer: sections (e.g. Common, Production switcher), each with groups
+    featureSections: { id: string; name: string; description?: string }[]
+    featureGroups: { id: string; name: string; section: string; description?: string }[]
     features: FeatureDef[]
   }
 }

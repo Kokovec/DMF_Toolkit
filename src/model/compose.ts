@@ -1,9 +1,9 @@
-// Module design → ports + parameter schema, and the design rules. Used live by the module
-// designer (drop checks, rule list) and by the server on save, so a module's derived parts can
-// never drift from its design.
+// Module design → ports + parameter schema, and the design rules. A product's module is defined
+// by its design (scripts/product-catalogs.ts); the server checks it on import and save, so a
+// module's derived parts never drift from its design. Also: which inputs and outputs an instance runs.
 import { getFeature, matchesFeature } from './library'
 import { KNOWN_FORMATS, TRANSPORT_LABELS } from './vocabulary'
-import type { Essence, FeatureDef, InputSelection, JsonSchema, ModuleBlock, ModuleDesign, PortDef, VendorModule } from './types'
+import type { Essence, FeatureDef, InputSelection, JsonSchema, ModuleBlock, ModuleDesign, OutputSelection, PortDef, VendorModule } from './types'
 
 export const BLOCK_ID_RE = /^[a-z][a-z0-9-]*$/ // no dots: block ids prefix port and parameter paths
 
@@ -11,16 +11,7 @@ export const EMPTY_DESIGN: ModuleDesign = { blocks: [], moduleFeatures: [] }
 
 const label = (b: ModuleBlock) => `${getFeature(b.feature)?.name ?? b.feature} (${b.id})`
 
-// A fresh block id from the feature, e.g. "input.srt" -> "srt1", "output.mxl" -> "mxl1".
-export function newBlockId(design: ModuleDesign, featureId: string): string {
-  const base = featureId.slice(featureId.lastIndexOf('.') + 1).replace(/[^a-z0-9-]/g, '').replace(/^[^a-z]+/, '') || 'block'
-  const sep = /\d$/.test(base) ? '-' : '' // "st2022-7" -> "st2022-7-1"
-  let n = 1
-  while (design.blocks.some((b) => b.id === `${base}${sep}${n}`)) n++
-  return `${base}${sep}${n}`
-}
-
-// Feed types the author can choose on a block with ports: a video feed (with its audio and ANC)
+// Feed types a block with ports offers: a video feed (with its audio and ANC)
 // or an audio-only feed. Blocks without ports have none.
 export function feedOptions(f: FeatureDef): Essence[] | undefined {
   if (f.external) return f.external.essenceOptions
@@ -30,14 +21,7 @@ export function feedOptions(f: FeatureDef): Essence[] | undefined {
 
 const feedOf = (b: ModuleBlock, f: FeatureDef): Essence => b.essence ?? feedOptions(f)?.[0] ?? 'video'
 
-// ---- Drop-time rules (the designer refuses invalid drops with the reason) ----
-
-export function canAddFeature(design: ModuleDesign, f: FeatureDef): string | null {
-  const max = f.rules?.maxPerModule
-  const used = design.blocks.filter((b) => b.feature === f.id).length + design.moduleFeatures.filter((m) => m === f.id).length
-  if (max !== undefined && used >= max) return `${f.name}: at most ${max} per module`
-  return null
-}
+// ---- Add-on rules ----
 
 export function canAttach(design: ModuleDesign, addon: FeatureDef, blockId: string): string | null {
   const b = design.blocks.find((x) => x.id === blockId)
@@ -156,7 +140,7 @@ export function composeModule(design: ModuleDesign): { ports: PortDef[]; schema:
   return { ports: design.blocks.flatMap(blockPorts), schema: { type: 'object', properties } }
 }
 
-// ---- Inputs: which ones an instance uses, and scaling out ----
+// ---- Inputs and outputs: which ones an instance uses, and scaling out ----
 
 export const MAX_SCALE_OUT = 64
 
@@ -164,8 +148,19 @@ export function isInputFeature(f: FeatureDef | undefined): boolean {
   return !!f && (f.external?.direction === 'in' || !!f.mxlInputs)
 }
 
+export function isOutputFeature(f: FeatureDef | undefined): boolean {
+  return !!f && (f.external?.direction === 'out' || !!f.mxlOutputs)
+}
+
+// Inputs and outputs can be scaled out (several copies per instance).
+export const isScalable = (f: FeatureDef | undefined) => isInputFeature(f) || isOutputFeature(f)
+
 export function inputBlocks(design: ModuleDesign): ModuleBlock[] {
   return design.blocks.filter((b) => isInputFeature(getFeature(b.feature)))
+}
+
+export function outputBlocks(design: ModuleDesign): ModuleBlock[] {
+  return design.blocks.filter((b) => isOutputFeature(getFeature(b.feature)))
 }
 
 // What a new instance uses: the first input for "one", every input once for "several".
@@ -179,32 +174,53 @@ export function inputsOf(design: ModuleDesign, chosen?: InputSelection): InputSe
   return chosen ?? defaultInputs(design)
 }
 
+// Outputs: every output once by default; an instance may turn one off (0) or scale it out.
+export function outputsOf(design: ModuleDesign, chosen?: OutputSelection): OutputSelection {
+  return { ...Object.fromEntries(outputBlocks(design).map((b) => [b.id, 1])), ...chosen }
+}
+
+const countProblems = (what: string, blocks: ModuleBlock[], sel: Record<string, number>): string[] => {
+  const errors: string[] = []
+  for (const id of Object.keys(sel)) if (!blocks.some((b) => b.id === id)) errors.push(`${what}: the module has no ${what.slice(0, -1)} ${id}`)
+  for (const b of blocks) {
+    const n = sel[b.id] ?? 0
+    const max = b.scaleOut ?? 1
+    if (!Number.isInteger(n) || n < 0 || n > max) errors.push(`${what}: ${label(b)} can be used 0 to ${max} times`)
+  }
+  return errors
+}
+
 // An instance's selection against the module's input rules.
 export function inputSelectionProblems(design: ModuleDesign, chosen?: InputSelection): string[] {
   const inputs = inputBlocks(design)
   if (!inputs.length) return []
   const sel = inputsOf(design, chosen)
-  const errors: string[] = []
-  for (const id of Object.keys(sel)) if (!inputs.some((b) => b.id === id)) errors.push(`inputs: the module has no input ${id}`)
-  for (const b of inputs) {
-    const n = sel[b.id] ?? 0
-    const max = b.scaleOut ?? 1
-    if (!Number.isInteger(n) || n < 0 || n > max) errors.push(`inputs: ${label(b)} can be used 0 to ${max} times`)
-  }
+  const errors = countProblems('inputs', inputs, sel)
   const used = inputs.filter((b) => (sel[b.id] ?? 0) > 0)
   if (design.inputRule === 'one' && used.length !== 1) errors.push('inputs: choose exactly one input')
   if (design.inputRule !== 'one' && !used.length) errors.push('inputs: choose at least one input')
   return errors
 }
 
+export function outputSelectionProblems(design: ModuleDesign, chosen?: OutputSelection): string[] {
+  const outputs = outputBlocks(design)
+  return outputs.length ? countProblems('outputs', outputs, outputsOf(design, chosen)) : []
+}
+
+// What one instance runs: its input and output selections (absent = the module's defaults).
+export type InstanceSelection = { inputs?: InputSelection; outputs?: OutputSelection }
+
 // Id of the k-th copy of a scaled-out block (k >= 2): "srt1_2". Block ids never contain "_".
 export const copyId = (blockId: string, k: number) => (k === 1 ? blockId : `${blockId}_${k}`)
 
-// The design as one instance runs it: unused inputs dropped, scaled-out inputs repeated.
-export function instanceDesign(design: ModuleDesign, chosen?: InputSelection): ModuleDesign {
-  const sel = inputsOf(design, chosen)
+// The design as one instance runs it: unused inputs and outputs dropped, scaled-out ones repeated.
+export function instanceDesign(design: ModuleDesign, chosen: InstanceSelection = {}): ModuleDesign {
+  const ins = inputsOf(design, chosen.inputs)
+  const outs = outputsOf(design, chosen.outputs)
   const blocks = design.blocks.flatMap((b) => {
-    if (!isInputFeature(getFeature(b.feature))) return [b]
+    const f = getFeature(b.feature)
+    const sel = isInputFeature(f) ? ins : isOutputFeature(f) ? outs : undefined
+    if (!sel) return [b]
     const n = Math.max(0, Math.min(sel[b.id] ?? 0, b.scaleOut ?? 1))
     return Array.from({ length: n }, (_, i) => ({ ...b, id: copyId(b.id, i + 1) }))
   })
@@ -213,11 +229,11 @@ export function instanceDesign(design: ModuleDesign, chosen?: InputSelection): M
 
 // Ports and core parameter schema of one instance (cached per module object and selection).
 const partsCache = new WeakMap<VendorModule, Map<string, { ports: PortDef[]; schema: JsonSchema }>>()
-export function instanceParts(m: VendorModule, chosen?: InputSelection): { ports: PortDef[]; schema: JsonSchema } {
-  if (!inputBlocks(m.design).length) return { ports: m.ports, schema: m.parameters.schema }
+export function instanceParts(m: VendorModule, chosen: InstanceSelection = {}): { ports: PortDef[]; schema: JsonSchema } {
+  if (!inputBlocks(m.design).length && !outputBlocks(m.design).length) return { ports: m.ports, schema: m.parameters.schema }
   let byKey = partsCache.get(m)
   if (!byKey) partsCache.set(m, (byKey = new Map()))
-  const key = JSON.stringify(inputsOf(m.design, chosen))
+  const key = JSON.stringify([inputsOf(m.design, chosen.inputs), outputsOf(m.design, chosen.outputs)])
   let parts = byKey.get(key)
   if (!parts) byKey.set(key, (parts = composeModule(instanceDesign(m.design, chosen))))
   return parts
@@ -261,14 +277,21 @@ export function designProblems(design: ModuleDesign): string[] {
     if (f?.rules?.maxPerModule !== undefined && used > f.rules.maxPerModule) errors.push(`${f.name}: at most ${f.rules.maxPerModule} per module`)
   }
   for (const m of design.moduleFeatures) if (getFeature(m)?.kind !== 'module') errors.push(`"${m}" is not a module-wide feature`)
-  // input rules
+  // input and output rules
   if (design.inputRule !== undefined && !['one', 'several'].includes(design.inputRule)) errors.push('input rule must be "one" or "several"')
   for (const b of design.blocks)
     if (b.scaleOut !== undefined) {
-      if (!isInputFeature(getFeature(b.feature))) errors.push(`${label(b)}: only inputs can be scaled out`)
+      if (!isScalable(getFeature(b.feature))) errors.push(`${label(b)}: only inputs and outputs can be scaled out`)
       else if (!Number.isInteger(b.scaleOut) || b.scaleOut < 1 || b.scaleOut > MAX_SCALE_OUT)
         errors.push(`${label(b)}: scale-out must be 1 to ${MAX_SCALE_OUT}`)
     }
+  // features that need another function in the module (e.g. SRT program output → program encoder)
+  const used = [...design.blocks.flatMap((b) => [b.feature, ...b.addons]), ...design.moduleFeatures]
+  for (const id of new Set(used)) {
+    const f = getFeature(id)
+    for (const r of f?.rules?.requires ?? [])
+      if (!design.blocks.some((b) => r.anyOf.some((p) => matchesFeature(p, b.feature)))) errors.push(`${f!.name}: ${r.message}`)
+  }
   if (design.blocks.length && !composeModule(design).ports.length) errors.push('The module has no inputs or outputs yet')
   return errors
 }

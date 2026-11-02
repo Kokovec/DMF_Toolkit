@@ -1,7 +1,7 @@
 // Core data model: primitives (base types per category), vendor modules (deployable catalog entries)
 // and the published workload graph. Specs: docs/media-primitive.md, docs/primitives/.
 
-export const API_VERSION = 'dmf-toolkit/v1alpha3'
+export const API_VERSION = 'dmf-toolkit/v1alpha4'
 
 // Ids of primitives, modules, ports, catalogs: lowercase letters, digits, . _ -
 export const ID_RE = /^[a-z0-9][a-z0-9._-]*$/
@@ -70,6 +70,7 @@ export type JsonSchema = {
   minimum?: number
   maximum?: number
   format?: string // 'secret-ref' marks a secret reference
+  pattern?: string // string values must match this regular expression
   'x-protocols'?: string[] // property applies only to modules using one of these protocols
   // Shown (and, if listed in the parent's `required`, required) only while sibling properties have
   // one of the given values, e.g. { "mode": ["caller", "rendezvous"] }.
@@ -83,7 +84,16 @@ export type JsonSchema = {
   'x-group'?: string
   // This parameter defines part of the MXL flow format written by the function's outputs.
   'x-flow'?: FlowField
+  // On a parameter group: which combinations of two of its fields are valid (see XAllowed).
+  'x-allowed'?: XAllowed
+  // The choices aren't fixed: they come from the instance. "inputs" = its input copies in use.
+  'x-options'?: 'inputs'
 }
+
+// Valid combinations of two fields of a group: values[<first field's value>] = the second field's
+// valid values. `message` is the refusal, with {field} replaced by a field's value and
+// {field.height} by the height of a WxH value, e.g. "{resolution.height}p{rate} is not a format".
+export type XAllowed = { fields: [string, string]; values: Record<string, string[]>; message?: string }
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
@@ -131,6 +141,16 @@ export type VendorModule = {
   // Derived from the design: ports and the core parameter schema (one group per block)
   ports: PortDef[]
   parameters: { schema: JsonSchema }
+  // Starting values for a new instance (not infrastructure decisions). Inputs and outputs not
+  // listed start unused.
+  defaults?: {
+    inputs?: InputSelection
+    outputs?: OutputSelection
+    control?: ControlSpec
+    resources?: ResourceProfile
+    discovery?: Discovery
+    parameters?: { [block: string]: JsonValue } // over the schema's defaults, for a new instance only
+  }
 }
 
 export type ModuleCatalog = {
@@ -211,6 +231,7 @@ export type FunctionInstance = {
   parameters: { [key: string]: JsonValue } // core parameters
   inputs?: InputSelection // which input blocks this instance uses, and how many copies of each
   outputs?: OutputSelection // how many copies of each output block this instance runs (0 = off)
+  features?: FeatureSelection // which optional functions and add-ons are on
   settings?: { [key: string]: JsonValue } // the vendor's own configuration (free-form), passed through unchanged
   control?: ControlSpec
   dependencies?: Dependency[]
@@ -241,12 +262,15 @@ export type WorkloadDefaults = {
   mxl?: { historyMs: number } // default flow history depth
 }
 
+// Usernames per role. Whether a user exists is checked at deployment.
+export type WorkloadAccess = { roles?: Record<string, string[]> }
+
 export type WorkloadDescription = {
   apiVersion: typeof API_VERSION
   kind: 'MediaWorkload'
   // description = the workflow intent, e.g. "SRT ingress -> MXL -> switcher + multiviewer"
   // uid = stable identity of this workload (namespace for flow ids)
-  // libraryVersion = primitive library version the published state was designed against
+  // libraryVersion = feature library version the published state was designed against
   metadata: { id: string; uid?: string; name: string; description?: string; revision?: number; libraryVersion?: string }
   spec: {
     defaults: WorkloadDefaults
@@ -255,6 +279,7 @@ export type WorkloadDescription = {
     externals: ExternalInstance[]
     wires: Wire[] // connection graph, port -> port
     flows?: FlowDef[] // published only: the MXL flows derived from the wires
+    access?: WorkloadAccess // who may operate the workload
   }
   // Canvas-only presentation; stripped from the published graph.
   layout?: { nodes: Record<string, { x: number; y: number }> }
@@ -306,6 +331,12 @@ export type ModuleBlock = {
   addons: string[]
   essence?: Essence // blocks with ports: video feed (with its audio/ANC) or audio-only feed
   scaleOut?: number // input and output blocks: up to this many copies per instance (default 1)
+  noData?: boolean // MXL blocks: a video feed has video and audio flows and no data flow
+  // Other functions an instance can turn off: the block itself, and add-ons by add-on key.
+  optional?: { default: boolean; addons?: Record<string, boolean> }
+  // Narrows a parameter group of this product, by its path in the block (e.g. "format.video"):
+  // the product only offers these combinations of what the shared feature allows.
+  allowed?: Record<string, XAllowed>
 }
 
 export type InputRule = 'one' | 'several'
@@ -314,6 +345,8 @@ export type InputRule = 'one' | 'several'
 export type InputSelection = Record<string, number>
 // Copies of each output block an instance uses (block id -> count; 0 = not used).
 export type OutputSelection = Record<string, number>
+// Optional functions of an instance, on or off, by block id or "<block>.<add-on key>".
+export type FeatureSelection = Record<string, boolean>
 
 // The module's design: the functions it offers (blocks with their add-ons) and module-wide
 // features. No wiring: how functions are used and configured is up to the workload.
@@ -332,6 +365,8 @@ export type Vocabulary = {
   formats: Record<Essence, string[]> // MXL media types per essence; the first is the default
   externals: { kind: ExternalKind; name: string; description: string; direction: 'in' | 'out'; essence: Essence }[]
   references: { id: ExternalRefKind; label: string; source: string; destination: string }[]
+  // Who can be given access to a workload: the roles offered (at least one user each if required)
+  access: { roles: { id: string; label: string; required?: boolean }[]; usernamePattern: string }
 }
 
 export type FeatureLibrary = {
@@ -341,7 +376,7 @@ export type FeatureLibrary = {
   spec: {
     vocabulary: Vocabulary
     categories: CategoryDef[]
-    // Sidebar of the module designer: sections (e.g. Common, Production switcher), each with groups
+    // How features are organised: sections (e.g. Common, Production switcher), each with groups
     featureSections: { id: string; name: string; description?: string }[]
     featureGroups: { id: string; name: string; section: string; description?: string }[]
     features: FeatureDef[]

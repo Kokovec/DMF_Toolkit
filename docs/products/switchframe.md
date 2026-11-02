@@ -1,11 +1,12 @@
 # Switchframe: production switcher module
 
-> Design rules: [`../design-rules.md`](../design-rules.md) (R3.1, R3.12–R3.15, R7.7, R8.4). This document maps
+> Design rules: [`../design-rules.md`](../design-rules.md) (R3.1, R3.12–R3.16, R7.7, R8.4). This document maps
 > the Switchframe module's features to the product's real configuration, for the orchestrator
-> (the "compiler") that will deploy it with Docker / Terraform. MXL deployment comes later.
+> (the "compiler"). The definition, with each option's owner and build stage, is in the orchestrator
+> repo: `switchframe-dmf/docs/orchestration/02-switchframe-options.md`. If the two differ, that one wins.
 
 Source: open-source **Switchframe** (github.com/zsiec/switchframe, fork github.com/thiagopnts/switchframe),
-`main@7923615` (2026-06-09). Read from its README, `docs/reference/config-and-flags.md`,
+`main@7923615` (2026-06-09), module `switchframe.1` version 1.1.0. Read from its README, `docs/reference/config-and-flags.md`,
 `docs/operations/deployment.md`, `docs/reference/api/*.md` and `docs/subsystems/*`.
 
 The module is in [`catalogs/switchframe.catalog.json`](../../catalogs/switchframe.catalog.json)
@@ -14,7 +15,7 @@ a library change. Modules aren't designed in the app: each one models a real pro
 
 ## How the product is modelled
 
-The feature library has a **Production switcher** section with four groups. The module uses all of them.
+The feature library has a **Production switcher** section with these groups. The module uses all of them.
 
 | Group | Features (module block ids) |
 |---|---|
@@ -25,6 +26,12 @@ The feature library has a **Production switcher** section with four groups. The 
 | Switcher add-ons | AI speech-to-text (on captions), SCTE-104 on MXL (on SCTE-35) |
 
 - ×N is the scale-out: how many copies of that input or output one instance may run.
+- A new instance starts with one MXL source and the MXL program output, health check `http 9090 /health`,
+  2 CPUs, 4096 MiB and `discovery.register: true` (module `defaults`). There's no `control.nmos`: the
+  product doesn't register itself; the facility's flow agent registers every flow.
+- Optional functions are turned on and off per instance (General tab, published as `features`). Off, a
+  function has no tab and no parameters. Default on: Instant replay. Default off: Program recording,
+  Closed captions (and AI speech-to-text), SCTE-35 (and SCTE-104), Playout channels, AI background removal.
 - Each instance is configured in its dialog (double-click the node):
   - the **Inputs** tab sets how many of each input type, then each source's settings in sub-tabs:
     connection, Source, Audio channel, Upstream key, Network constraints, Expected payload;
@@ -46,36 +53,29 @@ The feature library has a **Production switcher** section with four groups. The 
   - the SRT/RTMP outputs and recording need the Program encoder;
   - SCTE-104 needs an MXL source or MXL program output;
   - the encoder needs at least one codec;
+  - resolution × rate must be a Switchframe format (`x-allowed`): 1080p at 23.976, 24, 25, 29.97, 30, 50,
+    59.94, 60; 720p and 2160p at 25, 29.97, 30, 50, 59.94, 60;
+  - `engine.engine.onAirAtStart` must name an input copy in use (unset: the first, published explicitly);
   - each feature is at most once per module.
 
 ## Settings → Switchframe configuration
 
 Values come from the published function: `parameters.<block>` (copies `<block>_2`, `_3`…), `inputs`,
-`outputs`, `settings`, `control`, `dependencies`, `resources`. Secrets arrive as `{"$secret": name}` and
+`outputs`, `features`, `settings`, `control`, `dependencies`, `resources`. Secrets arrive as `{"$secret": name}` and
 are resolved by the orchestrator.
 
 | Module setting | Switchframe | Notes |
 |---|---|---|
-| `engine.engine.resolution` + `rate` | `--format` (e.g. `1080p29.97`) | Presets: 720p 25–60, 1080p 23.976–60, 2160p 25–60. Other combinations must be refused at compile time |
+| `engine.engine.resolution` + `rate` | `--format` (e.g. `1080p29.97`) | The model refuses combinations that aren't formats |
 | `engine.engine.colorProfile` | `--color-format` | `standard` / `standard-hevc` / `professional` |
-| `engine.engine.frameSync` | `--frame-sync` (freerun), `--low-latency-sync` (source-driven) | |
+| `engine.engine.frameSync` | `off`: none; `freerun`: `--frame-sync`; `source-driven`: `--low-latency-sync` | Leave off for MXL sources |
 | `engine.engine.frameRateConversion` | `--frc-quality` | |
-| `encoder.encoder.bitrateMbps` | `--output-bitrate` (bit/s = Mbit/s × 10⁶) | 0 = auto |
-| `encoder.encoder.gopSeconds` / `preset` / `timecode` | `--output-gop-secs` / `--output-preset` / `--output-timecode` | |
-| AI speech-to-text add-on | `--asr-sidecar`, `--asr-default-backend` (= `captions.asr.backend`) | The sidecar binary and model dirs come with the image |
-| `scte35.scte35.*` | `--scte35`, `--scte35-pid`, `--scte35-preroll`, `--scte35-heartbeat`, `--scte35-verify`, `--scte35-webhook` | |
-| SCTE-104 add-on | `--scte104` | Only with MXL in use |
-| `replay.replay.bufferSeconds` | `--replay-buffer-secs` | |
-| `clips.clips.storageMaxGB` / `ephemeralTtlHours` | `--clip-storage-max` (bytes) / `--clip-ephemeral-ttl` | |
-| `playout.playout.cacheMaxGB` / `asRunRetentionDays` | `--playout` + `--playout-cache-max` / `--playout-asrun-retention` | |
-| `control.control.previewProxy` / `previewResolution` / `previewBitrateKbps` | `--preview-proxy` / `--preview-resolution` / `--preview-bitrate` (bit/s) | |
-| `control.control.relayResolution` / `relayBitrateKbps` | `--relay-resolution` / `--relay-bitrate` (bit/s) | |
-| `control.control.allowedOrigins` | `--allowed-origins` | |
-| `control.control.access.apiToken` | env `SWITCHFRAME_API_TOKEN` | Empty: Switchframe generates one |
-| `control.control.access.*Invite` | env `SWITCHFRAME_INVITE_TOKENS` = `director:…,audio:…,graphics:…,viewer:…` | |
-| SRT source, mode `listener` | `--srt-listen` (one shared listener) | Sources are told apart by stream ID |
-| SRT source, mode `caller` | `POST /api/sources` `{type: srt, mode: caller, address, streamID, label, latencyMs, inputBW, overheadBW}` | `inputBW` is bytes/s (Mbit/s × 125 000); `label` = instance's source name |
-| SRT source `latencyMs` (listener) | `--srt-latency` (default for all pushes) | Per-source: `PUT /api/sources/{key}/srt` |
+| `engine.engine.onAirAtStart` | Cut to that source's key when nothing is on air | Programme flows are only published with a source on air |
+| `mxl-src` copies (wires) | `--mxl-sources video:audio[:data]` | Flow IDs from the wires. The optional `anc` port is the data flow, which the product reads |
+| `mxl-out` copies (0 or 1) | `--mxl-output`, `--mxl-output-video-def`, `--mxl-output-audio-def` | From the published `flows`; its video and audio flows are published even when unread. No data flow (`noData`): `server/cmd/switchframe` opens no data writer for the programme, so captions and SCTE-104 don't reach MXL output |
+| SRT source, mode `listener` | `--srt-listen` (one shared listener, port allocated) | Key `srt:<streamId>` |
+| SRT source, mode `caller`: `address`, `streamId`, `latencyMs`, `inputBandwidthMbps`, `overheadPercent` | `POST /api/sources` once | `inputBW` = Mbit/s × 125 000 |
+| SRT source `latencyMs` (listener) | Most common value to `--srt-latency` | Others: `PUT /api/sources/{key}/srt` |
 | `<source>.source.label` | `POST /api/sources/{key}/label` | Max 64 characters |
 | `<source>.source.position` | `PUT /api/sources/{key}/position` | Multiview order |
 | `<source>.source.delayMs` | `POST /api/sources/{key}/delay` | 0–500 ms, video + audio |
@@ -85,20 +85,30 @@ are resolved by the orchestrator.
 | `<source>.audio.gate` | `PUT /api/audio/{source}/gate` `{threshold, range, attack, release, hold, enabled}` | |
 | `<source>.audio.eq.low/mid/high` | `PUT /api/audio/{source}/eq` `{band: 0/1/2, frequency, gain, q, enabled}` | One call per band |
 | `<source>.audio.compressor` | `PUT /api/audio/{source}/compressor` `{threshold, ratio, attack, release, makeupGain}` | Ratio 1 = off |
-| `<source>.key` | `PUT /api/sources/{source}/key` (`graphics.KeyConfig`); `type: off` → `DELETE` | `fillSource` = the fill source's key |
+| `<source>.key.type` chroma, luma | `PUT /api/sources/{source}/key` (`graphics.KeyConfig`); `off` → `DELETE` | `neural` needs a CUDA build |
+| `encoder.encoder.bitrateMbps` | `--output-bitrate` (bit/s) | 0 = auto |
+| `encoder.encoder.gopSeconds` / `preset` / `timecode` | `--output-gop-secs` / `--output-preset` / `--output-timecode` | |
+| `srt-out.srt.*`, mode caller | `POST /api/output/destinations` type `srt-caller`, then `…/{id}/start` | Not persisted by the product: recreated, matched by `name` = block id. `maxBandwidth` in bytes/s. `passphrase` is a secret. Mode listener isn't available: no output ports |
+| `rtmp-out.rtmp.url` / `streamKey` | Destination type `rtmp`, `url` / `streamID` | Stream key is a secret |
+| `recording` on; `recording.recording.*` | `POST /api/recording/start` `{outputDir: "/recordings", rotateAfterMins, maxFileSizeMB, filenamePrefix}` | Restarted when stopped unexpectedly |
+| `recording.recording.storageGiB` | Size of the recordings volume | Orchestrator only; required when on, default 50 |
 | `audio.master.limiter` | `PUT /api/audio/limiter` `{threshold, ceiling}` | |
-| `captions.captions.mode` | `--captions` (unless `off`) + `POST /api/captions/mode` | |
-| `captions.asr.*` | `PUT /api/asr/config` `{backend, modelName, confidence, speakerDetection}` | |
+| `replay` on/off; `replay.replay.bufferSeconds` | `--replay-buffer-secs` (0 when off) | |
 | `replay.replay.shutterAngle` | `PUT /api/replay/shutter-angle` `{angle}` | |
+| `clips.clips.storageMaxGB` / `ephemeralTtlHours` | `--clip-storage-max` (bytes) / `--clip-ephemeral-ttl` | |
+| `captions` on; `captions.captions.mode` | `--captions`, `POST /api/captions/mode` | `passthrough` or `author`; the toggle turns them off |
+| `captions.asr` on; `captions.asr.*` | `--asr-sidecar`, `--asr-default-backend`; `PUT /api/asr/config` `{backend, modelName, confidence, speakerDetection}` | Needs an image with the sidecar |
+| `scte35` on; `scte35.scte35.pid`, `prerollMs`, `heartbeatMs`, `verify`, `webhookUrl` | `--scte35`, `--scte35-pid`, `--scte35-preroll`, `--scte35-heartbeat`, `--scte35-verify`, `--scte35-webhook` | |
 | `scte35.scte35.defaultRule` | `PUT /api/scte35/rules/default` `{action}` | |
-| MXL source copies | `--mxl-sources videoUUID:audioUUID:dataUUID,…` | UUIDs from the published `spec.flows` read by `mxl-src*` |
-| MXL program output | `--mxl-output`, `--mxl-output-video-def`, `--mxl-output-audio-def` | Flow definitions written from `spec.flows[].format` (the engine's format) |
-| ST 2110 receiver copies | `--st2110-inputs` (count) | |
-| SRT program output copies | `POST /api/output/destinations` `{type: srt-caller|srt-listener, address, port, streamID, latency, encryption, passphrase, maxBandwidth, maxConns, scte35Enabled}`, then `…/{id}/start` | `maxBandwidth` in bytes/s |
-| RTMP program output copies | `POST /api/output/destinations` `{type: rtmp, url, streamID}` | Stream key → `streamID` |
-| Program recording | `POST /api/recording/start` `{outputDir, rotateAfterMins, maxFileSizeMB, filenamePrefix}` | `outputDir` from the instance's storage dependency |
-| `settings` (vendor settings, free JSON) | passed through | E.g. extra flags the model doesn't cover |
-| `control.health` (instance) | `GET :9090/health`, `/ready` | Use admin port 9090, path `/health` |
+| `scte35.scte104` on | `--scte104` | Needs an MXL copy in use, and MXL data flows |
+| `playout` on; `playout.playout.cacheMaxGB` / `asRunRetentionDays` | `--playout`, `--playout-cache-max` / `--playout-asrun-retention` | |
+| `control.control.preview*` | `--preview-proxy`, `--preview-resolution`, `--preview-bitrate` (bit/s) | |
+| `control.control.relay*` | `--relay-resolution`, `--relay-bitrate` (bit/s) | |
+| `spec.access.roles` (workload level) | Group membership in the facility's sign-on | A director is required |
+| `settings` (vendor settings, free JSON) | Only `settings.extraArgs` (string array) is used: appended to the args | The compiler warns on it and refuses `--demo` |
+| `control.health` (instance) | `GET :9090/health`, `/ready` | Prefilled from the module |
+
+API tokens, invite tokens and allowed browser origins aren't module settings: the orchestrator generates or sets them.
 
 ## What the orchestrator decides (Docker / Terraform)
 
@@ -142,4 +152,3 @@ None of this is in the desired state; it's the compiler's job (R1.2).
 - How MoQ sources are named and admitted (Prism stream naming), and whether MoQ needs a separate ingest.
 - Runtime state the operator creates (presets, macros, stingers, LUTs, wipe patterns, ST maps, SCTE-35 rules):
   could be dependencies (seed files) later.
-- The format presets as a design rule. Today the resolution × rate combination is checked only at compile time.

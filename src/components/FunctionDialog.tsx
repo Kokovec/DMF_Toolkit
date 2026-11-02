@@ -1,14 +1,14 @@
 // Configuring one function instance: a pop-up with a tab per feature of its product (opened by
-// double-clicking the node). Inputs and Outputs tabs set how many of each the instance runs and
-// configure each copy; every configurable feature has its own tab; Setup and Intent hold the
-// instance's deployment setup and the operator's expectations.
+// double-clicking the node). General turns optional functions on and off. Inputs and Outputs tabs
+// set how many of each the instance runs and configure each copy; every configurable feature that's
+// on has its own tab; Setup and Intent hold the instance's deployment setup and the operator's expectations.
 import { useEffect, useMemo, useState } from 'react'
-import { copyId, inputBlocks, inputsOf, inputSelectionProblems, outputBlocks, outputsOf, outputSelectionProblems } from '../model/compose'
+import { addonKey, copyId, featuresOf, inputBlocks, inputCopies, inputsOf, inputSelectionProblems, outputBlocks, outputsOf, outputSelectionProblems } from '../model/compose'
 import { getFeature } from '../model/library'
-import type { Expectations, JsonSchema, JsonValue, ModuleBlock, PlacementConstraints, VendorModule } from '../model/types'
-import { schemaOf, withSelection, type FnData } from '../model/workload'
+import type { Expectations, FeatureSelection, JsonSchema, JsonValue, ModuleBlock, PlacementConstraints, VendorModule } from '../model/types'
+import { discoveryOf, schemaOf, withSelection, type FnData } from '../model/workload'
 import { FunctionSetup } from './FunctionSetup'
-import { SchemaForm } from './SchemaForm'
+import { SchemaForm, type SchemaChoices } from './SchemaForm'
 
 type Obj = { [k: string]: JsonValue }
 
@@ -37,6 +37,8 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
   const params = data.parameters
   const update = (patch: Partial<FnData>) => onChange({ ...data, ...patch })
   const setGroup = (group: string, v: Obj) => update({ parameters: { ...params, [group]: v } })
+  // Fields whose choices come from the instance, e.g. which input is on air at start.
+  const choices: SchemaChoices = { inputs: inputCopies(prim, data).map((c) => ({ value: c.id, label: c.name })) }
 
   // One tab per feature with settings, in the product's order; inputs and outputs get one tab each.
   const tabs = useMemo((): Tab[] => {
@@ -66,6 +68,7 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
   const tabOf = (p: string): string => {
     if (p.startsWith('inputs:')) return 'inputs'
     if (p.startsWith('outputs:')) return 'outputs'
+    if (p.startsWith('features:')) return 'general'
     const head = p.split(/[.:\s]/)[0]
     const block = head.replace(/_\d+$/, '')
     if (inputBlocks(prim.design).some((b) => b.id === block)) return 'inputs'
@@ -105,14 +108,19 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
           ))}
         </nav>
         <div className="dialog-body">
-          {current.kind === 'general' && <General id={id} data={data} update={update} />}
+          {current.kind === 'general' && (
+            <>
+              <General id={id} data={data} update={update} />
+              <Features prim={prim} data={data} onChange={(features) => onChange(withSelection(data, prim, { features }))} />
+            </>
+          )}
           {current.kind === 'inputs' && (
             <Copies
               which="inputs"
               blocks={inputBlocks(prim.design)}
-              counts={inputsOf(prim.design, data.inputs)}
+              counts={inputsOf(prim, data.inputs)}
               rule={prim.design.inputRule ?? 'several'}
-              problems={inputSelectionProblems(prim.design, data.inputs)}
+              problems={inputSelectionProblems(prim, data.inputs)}
               onCounts={(inputs) => onChange(withSelection(data, prim, { inputs }))}
               schema={schema}
               params={params}
@@ -123,8 +131,8 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
             <Copies
               which="outputs"
               blocks={outputBlocks(prim.design)}
-              counts={outputsOf(prim.design, data.outputs)}
-              problems={outputSelectionProblems(prim.design, data.outputs)}
+              counts={outputsOf(prim, data.outputs)}
+              problems={outputSelectionProblems(prim, data.outputs)}
               onCounts={(outputs) => onChange(withSelection(data, prim, { outputs }))}
               schema={schema}
               params={params}
@@ -132,7 +140,7 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
             />
           )}
           {current.kind === 'block' && (
-            <GroupTabs key={current.group} schema={schema.properties![current.group]} value={(params[current.group] as Obj) ?? {}} root={params} onChange={(v) => setGroup(current.group, v)} />
+            <GroupTabs key={current.group} schema={schema.properties![current.group]} value={(params[current.group] as Obj) ?? {}} root={params} choices={choices} onChange={(v) => setGroup(current.group, v)} />
           )}
           {current.kind === 'setup' && <FunctionSetup key={id} data={data} vendor={prim.vendor} update={update} />}
           {current.kind === 'intent' && <Intent data={data} prim={prim} others={others} update={update} />}
@@ -175,16 +183,54 @@ function General({ id, data, update }: { id: string; data: FnData; update: (p: P
   )
 }
 
+// ---- Optional functions: on or off. An add-on is offered only while its function is on. ----
+
+function Features({ prim, data, onChange }: { prim: VendorModule; data: FnData; onChange: (features: FeatureSelection) => void }) {
+  const blocks = prim.design.blocks.filter((b) => b.optional)
+  if (!blocks.length) return null
+  const on = featuresOf(prim, data.features)
+  const set = (key: string, v: boolean) => onChange({ ...data.features, [key]: v })
+  const name = (feature: string) => getFeature(feature)?.name ?? feature
+  return (
+    <div className="dialog-form features">
+      <h3>Features</h3>
+      <p className="hint">What this instance runs. A feature that's off has no tab and isn't published.</p>
+      {blocks.map((b) => (
+        <div key={b.id}>
+          <label className="field field-check" title={getFeature(b.feature)?.description}>
+            <input type="checkbox" checked={on[b.id]} onChange={(e) => set(b.id, e.target.checked)} />
+            <span>{name(b.feature)}</span>
+          </label>
+          {on[b.id] &&
+            b.addons
+              .filter((a) => addonKey(a) in (b.optional?.addons ?? {}))
+              .map((a) => {
+                const key = `${b.id}.${addonKey(a)}`
+                return (
+                  <label key={key} className="field field-check feature-addon" title={getFeature(a)?.description}>
+                    <input type="checkbox" checked={on[key]} onChange={(e) => set(key, e.target.checked)} />
+                    <span>{name(a)}</span>
+                  </label>
+                )
+              })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ---- A feature's settings: one sub-tab per parameter group when it has several ----
 
-function GroupTabs({ schema, value, root, onChange }: { schema: JsonSchema; value: Obj; root: Obj; onChange: (v: Obj) => void }) {
+type GroupTabsProps = { schema: JsonSchema; value: Obj; root: Obj; choices?: SchemaChoices; onChange: (v: Obj) => void }
+
+function GroupTabs({ schema, value, root, choices, onChange }: GroupTabsProps) {
   const groups = Object.entries(schema.properties ?? {}).filter(([, s]) => s.type === 'object' && s.properties)
   const [sub, setSub] = useState(groups[0]?.[0])
   // a single group (or loose fields): show it directly
   if (groups.length < 2 || groups.length !== Object.keys(schema.properties ?? {}).length)
     return (
       <div className="dialog-form">
-        <SchemaForm schema={groups.length === 1 ? groups[0][1] : schema} value={groups.length === 1 ? ((value[groups[0][0]] as Obj) ?? {}) : value} root={root} onChange={(v) => onChange(groups.length === 1 ? { ...value, [groups[0][0]]: v } : v)} />
+        <SchemaForm schema={groups.length === 1 ? groups[0][1] : schema} value={groups.length === 1 ? ((value[groups[0][0]] as Obj) ?? {}) : value} root={root} choices={choices} onChange={(v) => onChange(groups.length === 1 ? { ...value, [groups[0][0]]: v } : v)} />
       </div>
     )
   const active = groups.find(([k]) => k === sub) ?? groups[0]
@@ -201,7 +247,7 @@ function GroupTabs({ schema, value, root, onChange }: { schema: JsonSchema; valu
       <div className="dialog-form">
         {active[1].description && <p className="hint">{active[1].description}</p>}
         {audience && <p className={`audience ${audience}`}>{AUDIENCE[audience]}</p>}
-        <SchemaForm key={active[0]} schema={active[1]} value={(value[active[0]] as Obj) ?? {}} root={root} onChange={(v) => onChange({ ...value, [active[0]]: v })} />
+        <SchemaForm key={active[0]} schema={active[1]} value={(value[active[0]] as Obj) ?? {}} root={root} choices={choices} onChange={(v) => onChange({ ...value, [active[0]]: v })} />
       </div>
     </>
   )
@@ -308,7 +354,7 @@ function Copies({ which, blocks, counts, rule, problems, onCounts, schema, param
 function Intent({ data, prim, others, update }: { data: FnData; prim: VendorModule; others: string[]; update: (p: Partial<FnData>) => void }) {
   const ex = data.expectations ?? {}
   const pl = data.placement ?? {}
-  const disc = data.discovery ?? { register: !!data.control?.nmos }
+  const disc = discoveryOf(prim, data)
   const setEx = (patch: Partial<Expectations>) => update({ expectations: clean({ ...ex, ...patch }) })
   const setPl = (patch: Partial<PlacementConstraints>) => update({ placement: clean({ ...pl, ...patch }) })
   const ids = (v: string) => {

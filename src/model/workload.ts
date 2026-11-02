@@ -2,9 +2,23 @@ import type { Edge, Node } from '@xyflow/react'
 import { currentCatalog, resolvePorts, wireMismatch, type Catalog, type ResolvedPort } from './catalog'
 import { EXTERNALS } from './externals'
 import { KNOWN_FORMATS } from './vocabulary'
-import { inputBlocks, inputsOf, inputSelectionProblems, instanceParts, outputBlocks, outputsOf, outputSelectionProblems, type InstanceSelection } from './compose'
+import {
+  featuresOf,
+  featureSelectionProblems,
+  inputBlocks,
+  inputCopies,
+  inputsOf,
+  inputSelectionProblems,
+  instanceDesign,
+  instanceParts,
+  outputBlocks,
+  outputsOf,
+  outputSelectionProblems,
+  requiresProblems,
+  type InstanceSelection,
+} from './compose'
 import { LIBRARY } from './library'
-import { defaultsFor, getPath, leafPaths, validateValue, withoutInapplicable } from './schema'
+import { defaultsFor, getPath, leafPaths, optionPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
 import {
   API_VERSION,
@@ -20,6 +34,7 @@ import {
   type FlowField,
   type FlowFormat,
   type FlowOptions,
+  type FeatureSelection,
   type FunctionInstance,
   type InputSelection,
   type OutputSelection,
@@ -31,6 +46,7 @@ import {
   type VendorModule,
   type Wire,
   type WorkloadDefaults,
+  type WorkloadAccess,
   type WorkloadDescription,
 } from './types'
 
@@ -44,7 +60,8 @@ export type FnData = {
   domain: string
   parameters: { [key: string]: JsonValue } // core parameters
   inputs?: InputSelection // input blocks used and their copies; absent = the module's default
-  outputs?: OutputSelection // output blocks used and their copies; absent = every output once
+  outputs?: OutputSelection // output blocks used and their copies; absent = the module's default
+  features?: FeatureSelection // optional functions on or off; absent = the module's default
   settings: { [key: string]: JsonValue } // the vendor's own configuration (free-form)
   control?: ControlSpec
   dependencies?: Dependency[]
@@ -86,14 +103,14 @@ export function portsOf(data: FnData | ExtData, cat: Catalog = currentCatalog())
 }
 
 // An instance's input/output selection.
-const sel = (d: { inputs?: InputSelection; outputs?: OutputSelection }): InstanceSelection => ({ inputs: d.inputs, outputs: d.outputs })
+const sel = (d: InstanceSelection): InstanceSelection => ({ inputs: d.inputs, outputs: d.outputs, features: d.features })
 
-// The core parameter schema of one instance: only its inputs and outputs, repeated when scaled out.
-export function schemaOf(prim: VendorModule, data: Pick<FnData, 'inputs' | 'outputs'>): JsonSchema {
+// The core parameter schema of one instance: only what it runs, repeated when scaled out.
+export function schemaOf(prim: VendorModule, data: InstanceSelection): JsonSchema {
   return instanceParts(prim, sel(data)).schema
 }
 
-// Change which inputs/outputs an instance uses: parameters follow (new copies start from defaults,
+// Change what an instance runs: parameters follow (new copies and functions start from defaults,
 // values of blocks that stay keep theirs). Wires to ports that go away are pruned by the caller.
 export function withSelection(data: FnData, prim: VendorModule, chosen: InstanceSelection): FnData {
   const next = { ...data, ...chosen }
@@ -117,6 +134,17 @@ export function nextNodeId(base: string, existing: Iterable<string>): string {
   return `${base}-${n}`
 }
 
+// `over` on top of `base`, object by object.
+function merged(base: { [k: string]: JsonValue }, over: { [k: string]: JsonValue }): { [k: string]: JsonValue } {
+  const out = structuredClone(base)
+  for (const [k, v] of Object.entries(over)) {
+    const b = out[k]
+    const isObject = (x: JsonValue) => !!x && typeof x === 'object' && !Array.isArray(x)
+    out[k] = b !== undefined && isObject(b) && isObject(v) ? merged(b as { [k: string]: JsonValue }, v as { [k: string]: JsonValue }) : structuredClone(v)
+  }
+  return out
+}
+
 export function newFunctionData(prim: VendorModule, name: string): FnData {
   return {
     kind: 'fn',
@@ -124,9 +152,14 @@ export function newFunctionData(prim: VendorModule, name: string): FnData {
     typeVersion: prim.version,
     name,
     domain: DEFAULT_DOMAIN,
-    parameters: (defaultsFor(instanceParts(prim, {}).schema) as { [k: string]: JsonValue }) ?? {},
+    parameters: merged((defaultsFor(instanceParts(prim, {}).schema) as { [k: string]: JsonValue }) ?? {}, prim.defaults?.parameters ?? {}),
     settings: {},
-    control: { health: { type: 'http', port: 8080, path: '/healthz' } },
+    // The module's starting values; what it doesn't say keeps the general defaults.
+    ...(prim.defaults?.inputs ? { inputs: inputsOf(prim) } : {}),
+    ...(prim.defaults?.outputs ? { outputs: outputsOf(prim) } : {}),
+    control: structuredClone(prim.defaults?.control) ?? { health: { type: 'http', port: 8080, path: '/healthz' } },
+    ...(prim.defaults?.resources ? { resources: structuredClone(prim.defaults.resources) } : {}),
+    ...(prim.defaults?.discovery ? { discovery: structuredClone(prim.defaults.discovery) } : {}),
   }
 }
 
@@ -149,9 +182,10 @@ function carryOver(schema: JsonSchema, old: JsonValue | undefined): { [k: string
 // control & health, dependencies, resources) stays as it is.
 export function rebind(data: FnData, prim: VendorModule): FnData {
   // selections carry over if the new module still accepts them, else its defaults apply
-  const inputs = data.inputs && !inputSelectionProblems(prim.design, data.inputs).length ? data.inputs : undefined
-  const outputs = data.outputs && !outputSelectionProblems(prim.design, data.outputs).length ? data.outputs : undefined
-  return { ...data, type: prim.id, typeVersion: prim.version, inputs, outputs, parameters: carryOver(instanceParts(prim, { inputs, outputs }).schema, data.parameters) }
+  const inputs = data.inputs && !inputSelectionProblems(prim, data.inputs).length ? data.inputs : undefined
+  const outputs = data.outputs && !outputSelectionProblems(prim, data.outputs).length ? data.outputs : undefined
+  const features = data.features && !featureSelectionProblems(prim, data.features).length ? data.features : undefined
+  return { ...data, type: prim.id, typeVersion: prim.version, inputs, outputs, features, parameters: carryOver(instanceParts(prim, { inputs, outputs, features }).schema, data.parameters) }
 }
 
 // ---- Wiring ----
@@ -279,6 +313,7 @@ export function toWorkload(
   defaults: WorkloadDefaults,
   nodes: CanvasNode[],
   wires: Wire[],
+  access?: WorkloadAccess,
 ): WorkloadDescription {
   const functions: FunctionInstance[] = []
   const externals: WorkloadDescription['spec']['externals'] = []
@@ -305,6 +340,7 @@ export function toWorkload(
     }
     if (d.inputs) fn.inputs = d.inputs
     if (d.outputs) fn.outputs = d.outputs
+    if (d.features && Object.keys(d.features).length) fn.features = d.features
     if (d.settings && Object.keys(d.settings).length) fn.settings = d.settings
     if (d.control && Object.keys(d.control).length) fn.control = d.control
     if (d.dependencies?.length) fn.dependencies = d.dependencies
@@ -320,7 +356,7 @@ export function toWorkload(
     apiVersion: API_VERSION,
     kind: 'MediaWorkload',
     metadata,
-    spec: { defaults, domains, functions, externals, wires },
+    spec: { defaults, domains, functions, externals, wires, ...(access?.roles && Object.keys(access.roles).length ? { access } : {}) },
     layout: { nodes: Object.fromEntries(nodes.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }])) },
   }
 }
@@ -330,6 +366,7 @@ export function fromWorkload(doc: WorkloadDescription): {
   defaults: WorkloadDefaults
   nodes: CanvasNode[]
   wires: Wire[]
+  access?: WorkloadAccess
 } {
   const pos = (id: string, i: number) => doc.layout?.nodes[id] ?? { x: (i % 5) * 260, y: Math.floor(i / 5) * 200 }
   const fns: CanvasNode[] = doc.spec.functions.map((f, i) => ({
@@ -345,6 +382,7 @@ export function fromWorkload(doc: WorkloadDescription): {
       parameters: f.parameters ?? {},
       inputs: f.inputs,
       outputs: f.outputs,
+      features: f.features,
       settings: f.settings ?? {},
       control: f.control,
       dependencies: f.dependencies,
@@ -362,7 +400,7 @@ export function fromWorkload(doc: WorkloadDescription): {
     data: { kind: 'ext', extKind: e.kind, name: e.name, notes: e.notes, reference: e.reference },
   }))
   const { revision: _revision, ...metadata } = doc.metadata
-  return { metadata, defaults: doc.spec.defaults ?? DEFAULTS, nodes: [...fns, ...exts], wires: doc.spec.wires }
+  return { metadata, defaults: doc.spec.defaults ?? DEFAULTS, nodes: [...fns, ...exts], wires: doc.spec.wires, access: doc.spec.access }
 }
 
 export function isWorkloadEnvelope(doc: unknown): doc is WorkloadDescription {
@@ -436,8 +474,12 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
   for (const f of doc.spec.functions) {
     const prim = cat.get(f.type, f.typeVersion)!
     const parts = instanceParts(prim, sel(f))
-    errors.push(...inputSelectionProblems(prim.design, f.inputs).map((e) => `${f.id}: ${e}`))
-    errors.push(...outputSelectionProblems(prim.design, f.outputs).map((e) => `${f.id}: ${e}`))
+    errors.push(...inputSelectionProblems(prim, f.inputs).map((e) => `${f.id}: ${e}`))
+    errors.push(...outputSelectionProblems(prim, f.outputs).map((e) => `${f.id}: ${e}`))
+    errors.push(...featureSelectionProblems(prim, f.features).map((e) => `${f.id}: ${e}`))
+    // what's left on must still have what it needs (e.g. SCTE-104 with no MXL copy in use)
+    errors.push(...requiresProblems(instanceDesign(prim, sel(f))).map((e) => `${f.id}: features: ${e}`))
+    errors.push(...optionProblems(prim, f).map((e) => `${f.id}: ${e}`))
     errors.push(...validateValue(parts.schema, f.parameters).map((e) => `${f.id}: ${e}`))
     errors.push(...setupProblems(f).map((e) => `${f.id}: ${e}`))
     // '1' needs its wire (each path, when a port has two); '1..n' needs at least one array element wired.
@@ -451,6 +493,7 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
     for (const other of [...(f.placement?.with ?? []), ...(f.placement?.apart ?? [])])
       if (!doc.spec.functions.some((g) => g.id === other)) errors.push(`${f.id}: placement refers to unknown function ${other}`)
   }
+  errors.push(...accessProblems(doc.spec.access))
   return errors
 }
 
@@ -473,6 +516,59 @@ export function setupProblems(f: Pick<FunctionInstance, 'settings' | 'control' |
   }
   for (const [k, v] of Object.entries(f.resources ?? {}))
     if (k === 'gpu' ? !(v as { class?: string })?.class : typeof v !== 'number' || v < 0) errors.push(`resources: invalid ${k}`)
+  return errors
+}
+
+// An instance's discovery settings: its own, else the module's starting values, else whether it
+// registers itself.
+export function discoveryOf(prim: VendorModule | undefined, f: Pick<FunctionInstance, 'discovery' | 'control'>): Discovery {
+  return f.discovery ?? prim?.defaults?.discovery ?? { register: !!f.control?.nmos }
+}
+
+// Fields whose choices are the instance's input copies must name a copy in use.
+function optionProblems(prim: VendorModule, f: FunctionInstance): string[] {
+  const parts = instanceParts(prim, sel(f))
+  const copies = inputCopies(prim, sel(f)).map((c) => c.id)
+  return optionPaths(parts.schema).flatMap(({ path }) => {
+    const v = getPath(f.parameters, path)
+    return v === undefined || copies.includes(String(v)) ? [] : [`${path}: "${String(v)}" isn't an input in use (${copies.join(', ') || 'none'})`]
+  })
+}
+
+// Only what the instance runs and what applies: a group for something it doesn't run is dropped.
+function publishedParameters(schema: JsonSchema, parameters: FunctionInstance['parameters']): FunctionInstance['parameters'] {
+  const running = Object.fromEntries(Object.entries(parameters).filter(([k]) => schema.properties?.[k]))
+  return withoutInapplicable(schema, running) as FunctionInstance['parameters']
+}
+
+// An unset field of that kind means the first copy: published explicitly.
+function withResolvedOptions(prim: VendorModule, f: FunctionInstance, parameters: FunctionInstance['parameters']): FunctionInstance['parameters'] {
+  const first = inputCopies(prim, sel(f))[0]?.id
+  if (!first) return parameters
+  const out = structuredClone(parameters)
+  for (const { path } of optionPaths(instanceParts(prim, sel(f)).schema)) {
+    if (getPath(out, path) !== undefined) continue
+    const keys = path.split('.')
+    let cur = out
+    for (const k of keys.slice(0, -1)) {
+      if (!cur[k] || typeof cur[k] !== 'object') cur[k] = {}
+      cur = cur[k] as { [k: string]: JsonValue }
+    }
+    cur[keys[keys.length - 1]] = first
+  }
+  return out
+}
+
+// Who may operate the workload: required roles filled, known roles, valid usernames.
+export function accessProblems(access: WorkloadAccess | undefined): string[] {
+  const { roles, usernamePattern } = LIBRARY.spec.vocabulary.access
+  const pattern = new RegExp(usernamePattern)
+  const errors: string[] = []
+  for (const r of roles) if (r.required && !access?.roles?.[r.id]?.length) errors.push(`access: a ${r.id} is required`)
+  for (const [role, users] of Object.entries(access?.roles ?? {})) {
+    if (!roles.some((r) => r.id === role)) errors.push(`access: unknown role "${role}"`)
+    for (const u of users) if (!pattern.test(u)) errors.push(`access: "${u}" (${role}) isn't a valid username`)
+  }
   return errors
 }
 
@@ -557,7 +653,9 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
       if (port.direction !== 'out' || port.transport !== 'mxl') continue
       const writer = ref(f.id, port.key)
       const readers = doc.spec.wires.filter((w) => w.from === writer).map((w) => w.to)
-      if (!readers.length) continue
+      // The writer needs the definition of its video and audio flows even if nobody reads them yet;
+      // a data flow exists only when read.
+      if (!readers.length && port.essence === 'data') continue
       const opts = f.flowOptions?.[port.key] ?? {}
       flows.push({
         id: uuidV5(uid, writer),
@@ -569,7 +667,7 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
         format: flowFormat(port, parts.schema, f.parameters, doc.spec.defaults),
         historyMs: opts.historyMs ?? historyMs,
         discovery: {
-          register: opts.register ?? f.discovery?.register ?? !!f.control?.nmos,
+          register: opts.register ?? discoveryOf(prim, f).register,
           ...(opts.labels?.length ? { labels: opts.labels } : {}),
         },
       })
@@ -588,13 +686,14 @@ export function toPublished(doc: WorkloadDescription, revision: number, cat: Cat
       ...f,
       ...(prim
         ? {
-            parameters: withoutInapplicable(instanceParts(prim, sel(f)).schema, f.parameters) as FunctionInstance['parameters'],
-            // the selections in force, so the orchestrator knows which inputs and outputs (and how many) to run
-            ...(inputBlocks(prim.design).length ? { inputs: inputsOf(prim.design, f.inputs) } : {}),
-            ...(outputBlocks(prim.design).length ? { outputs: outputsOf(prim.design, f.outputs) } : {}),
+            parameters: withResolvedOptions(prim, f, publishedParameters(instanceParts(prim, sel(f)).schema, f.parameters)),
+            // the selections in force, so the orchestrator knows what to run and how many
+            ...(inputBlocks(prim.design).length ? { inputs: inputsOf(prim, f.inputs) } : {}),
+            ...(outputBlocks(prim.design).length ? { outputs: outputsOf(prim, f.outputs) } : {}),
+            ...(Object.keys(featuresOf(prim)).length ? { features: featuresOf(prim, f.features) } : {}),
           }
         : {}),
-      discovery: f.discovery ?? { register: !!f.control?.nmos },
+      discovery: discoveryOf(prim, f),
     }
   })
   return {

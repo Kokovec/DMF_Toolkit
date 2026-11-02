@@ -993,3 +993,6 @@ button.configure {
   width: 100%;
   margin: 8px 0 2px;
 }
+.feature-addon {
+  margin-left: 22px;
+}

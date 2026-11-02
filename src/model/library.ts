@@ -57,6 +57,10 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
     refs.add(r.id)
   }
 
+  const access = v.access
+  if (!access?.roles?.length || !access.usernamePattern) errors.push('vocabulary: access needs roles and a usernamePattern')
+  else if (new Set(access.roles.map((r) => r.id)).size !== access.roles.length) errors.push('vocabulary: access role ids must be unique')
+
   const cats = new Set<string>()
   for (const c of lib.spec.categories) {
     if (!ID_RE.test(c.id) || cats.has(c.id)) errors.push(`category ${c.id}: id must be unique and valid`)

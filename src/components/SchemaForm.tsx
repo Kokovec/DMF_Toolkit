@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { applies, isSecretRef, SECRET_FORMAT, titleFor, validateValue } from '../model/schema'
+import { allowedChoices, allowedProblem, applies, isSecretRef, SECRET_FORMAT, titleFor, validateValue } from '../model/schema'
 import type { JsonSchema, JsonValue } from '../model/types'
 
 type ObjectValue = { [key: string]: JsonValue }
 
+// Choices that come from the instance, by `x-options` source (e.g. its input copies in use).
+export type SchemaChoices = Partial<Record<'inputs', { value: string; label: string }[]>>
+
 // Form for an object schema (the JSON Schema subset in types.ts). Anything the form cannot
 // represent (arrays, untyped values) is edited as JSON.
 // `root` is the whole parameters object, for conditions that look at another group (x-when "srt.bonding").
-export function SchemaForm({ schema, value, onChange, root = value }: { schema: JsonSchema; value: ObjectValue; onChange: (v: ObjectValue) => void; root?: ObjectValue }) {
+export function SchemaForm({ schema, value, onChange, root = value, choices }: { schema: JsonSchema; value: ObjectValue; onChange: (v: ObjectValue) => void; root?: ObjectValue; choices?: SchemaChoices }) {
   // Fields with an `x-when` condition only show while their siblings match it.
   const props = Object.entries(schema.properties ?? {}).filter(([, s]) => applies(s, value, root))
   if (!props.length) return <p className="hint">No parameters.</p>
@@ -15,7 +18,8 @@ export function SchemaForm({ schema, value, onChange, root = value }: { schema: 
     <SchemaField
       key={key}
       name={key}
-      schema={s}
+      schema={schema['x-allowed'] ? { ...s, enum: allowedChoices(schema, key, value) } : s}
+      choices={choices}
       required={schema.required?.includes(key) ?? false}
       value={value[key]}
       siblings={value}
@@ -44,7 +48,16 @@ export function SchemaForm({ schema, value, onChange, root = value }: { schema: 
       </div>,
     )
   }
+  // A combination of fields that isn't valid (e.g. a frame rate the product has no format for).
+  const combination = allowedProblem(schema, value)
+  if (combination) rows.push(<p key="x-allowed" className="error-text">{combination}</p>)
   return <>{rows}</>
+}
+
+const AUDIENCE: Record<string, string> = {
+  function: 'injected into the media function',
+  orchestrator: 'for the orchestrator',
+  both: 'media function + orchestrator',
 }
 
 type FieldProps = {
@@ -54,14 +67,16 @@ type FieldProps = {
   value: JsonValue | undefined
   siblings: ObjectValue
   root: ObjectValue
+  choices?: SchemaChoices
   onChange: (v: JsonValue | undefined) => void
 }
 
-function SchemaField({ name, schema, required, value, siblings, root, onChange }: FieldProps) {
+function SchemaField({ name, schema, required, value, siblings, root, choices, onChange }: FieldProps) {
   const label = (
     <span>
       {titleFor(schema, siblings, root) ?? name}
       {required && <span className="required">*</span>}
+      {schema.type !== 'object' && schema['x-audience'] && <span className={`audience ${schema['x-audience']}`}>{AUDIENCE[schema['x-audience']]}</span>}
     </span>
   )
   const errors = required && value === undefined && schema.type !== 'object' ? [`${name}: required`] : validateValue(schema, value, name, root)
@@ -79,6 +94,25 @@ function SchemaField({ name, schema, required, value, siblings, root, onChange }
         <span className="hint">Secret reference, resolved by the orchestrator. Never the value itself.</span>
       </label>
     )
+  if (schema['x-options']) {
+    const options = choices?.[schema['x-options']] ?? []
+    const known = options.some((o) => o.value === value)
+    return (
+      <label className="field">
+        {label}
+        <select value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value || undefined)}>
+          <option value="">{options[0] ? `First (${options[0].label})` : '—'}</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+          {typeof value === 'string' && value && !known && <option value={value}>{value} (not in use)</option>}
+        </select>
+        {typeof value === 'string' && value && !known ? <span className="error-text">{value} isn't an input in use</span> : hint}
+      </label>
+    )
+  }
   if (schema.enum)
     return (
       <label className="field">
@@ -140,19 +174,14 @@ function SchemaField({ name, schema, required, value, siblings, root, onChange }
               {label}
               {schema['x-audience'] && (
                 <span className={`audience ${schema['x-audience']}`}>
-                  {
-                    {
-                      function: 'injected into the media function',
-                      orchestrator: 'for the orchestrator',
-                      both: 'media function + orchestrator',
-                    }[schema['x-audience']]
-                  }
+                  {AUDIENCE[schema['x-audience']]}
                 </span>
               )}
             </legend>
             {schema.description && <p className="hint">{schema.description}</p>}
             <SchemaForm
               root={root}
+              choices={choices}
               schema={schema}
               value={value && typeof value === 'object' && !Array.isArray(value) ? value : {}}
               onChange={(v) => onChange(v)}

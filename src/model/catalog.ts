@@ -1,8 +1,8 @@
-import { composeModule, designProblems } from './compose'
+import { composeModule, designProblems, inputSelectionProblems, instanceDesign, outputSelectionProblems } from './compose'
 import { getCategory } from './library'
 import { catalogProblems } from './modules'
 import { TRANSPORT_LABELS } from './vocabulary'
-import { applies, checkParameterSchema, getPath } from './schema'
+import { applies, checkParameterSchema, getPath, validateValue } from './schema'
 import {
   API_VERSION,
   ESSENCES,
@@ -185,7 +185,7 @@ export function checkModule(x: unknown): string[] {
   if (!p.name) err('missing name')
   if (typeof p.description !== 'string') err('missing description')
   if (!p.vendor) err('vendor is required')
-  if (!Array.isArray(p.categories) || !p.categories.length) err('choose at least one category (palette heading)')
+  if (!Array.isArray(p.categories) || !p.categories.length) err('choose at least one category')
   else for (const c of p.categories) if (!getCategory(c)) err(`unknown category ${c}`)
   if (!['singleton', 'scalable'].includes(p.capability?.scaling)) err('capability.scaling must be singleton or scalable')
 
@@ -199,6 +199,18 @@ export function checkModule(x: unknown): string[] {
   }
   const schemaErrors = checkParameterSchema(p.parameters?.schema)
   errors.push(...schemaErrors.map((e) => `core parameters: ${e}`))
+  // What a new instance starts with must itself be valid.
+  if (!design.length && p.defaults) {
+    if (p.defaults.inputs) errors.push(...inputSelectionProblems(p, p.defaults.inputs).map((e) => `defaults: ${e}`))
+    if (p.defaults.outputs) errors.push(...outputSelectionProblems(p, p.defaults.outputs).map((e) => `defaults: ${e}`))
+    if (p.defaults.discovery && typeof p.defaults.discovery.register !== 'boolean') err('defaults: discovery needs register true or false')
+    const running = composeModule(instanceDesign(p)).schema
+    for (const [block, value] of Object.entries(p.defaults.parameters ?? {})) {
+      const schema = running.properties?.[block]
+      if (!schema) err(`defaults: parameters: a new instance doesn't run "${block}"`)
+      else errors.push(...validateValue(schema, value, `defaults.parameters.${block}`).filter((e) => !e.endsWith(': required')))
+    }
+  }
   return errors
 }
 

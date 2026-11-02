@@ -20,7 +20,7 @@ import { api, describeError, refreshCatalog, useCatalog } from './api'
 import { EXTERNALS } from './model/externals'
 import { randomUuid } from './model/uuid'
 import { vendorSlug } from './model/modules'
-import type { ExternalKind, Wire, WorkloadDefaults, WorkloadDescription } from './model/types'
+import type { ExternalKind, Wire, WorkloadAccess, WorkloadDefaults, WorkloadDescription } from './model/types'
 import {
   DEFAULTS,
   checkWorkload,
@@ -68,7 +68,7 @@ function loadDraft() {
   } catch {
     // ignore unreadable storage
   }
-  return { metadata: newMeta(), defaults: DEFAULTS, nodes: [] as CanvasNode[], wires: [] as Wire[], saved: null }
+  return { metadata: newMeta(), defaults: DEFAULTS, nodes: [] as CanvasNode[], wires: [] as Wire[], access: undefined, saved: null }
 }
 
 const initial = loadDraft()
@@ -88,6 +88,7 @@ function Editor() {
   const [defaults, setDefaults] = useState<WorkloadDefaults>(initial.defaults)
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(initial.nodes)
   const [wires, setWires] = useState<Wire[]>(initial.wires)
+  const [access, setAccess] = useState<WorkloadAccess | undefined>(initial.access)
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState<SavedRef>(initial.saved)
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null)
@@ -100,7 +101,7 @@ function Editor() {
   const showMessage = useCallback((text: string, isError: boolean) => setMessage({ text, isError }), [])
 
   const edges = useMemo(() => edgesFor(wires, nodes, selectedEdges, catalog), [wires, nodes, selectedEdges, catalog])
-  const workload = useMemo(() => toWorkload(metadata, defaults, nodes, wires), [metadata, defaults, nodes, wires])
+  const workload = useMemo(() => toWorkload(metadata, defaults, nodes, wires, access), [metadata, defaults, nodes, wires, access])
   const json = useMemo(() => JSON.stringify(workload), [workload])
   const problems = useMemo(() => publishProblems(workload, catalog), [workload, catalog])
   // MXL flows carried by the selected wire(s), for the Flow panel.
@@ -134,9 +135,10 @@ function Editor() {
       setDefaults(loaded.defaults)
       setNodes(loaded.nodes)
       setWires(loaded.wires)
+      setAccess(loaded.access)
       setSelectedEdges(new Set())
       // Snapshot in canvas-normalised form so "modified" compares like with like.
-      const json = JSON.stringify(toWorkload(loaded.metadata, loaded.defaults, loaded.nodes, loaded.wires))
+      const json = JSON.stringify(toWorkload(loaded.metadata, loaded.defaults, loaded.nodes, loaded.wires, loaded.access))
       setSaved(revision === null ? null : { id: loaded.metadata.id, revision, json })
       requestAnimationFrame(() => fitView())
     },
@@ -261,6 +263,7 @@ function Editor() {
       setDefaults(DEFAULTS)
       setNodes([])
       setWires([])
+      setAccess(undefined)
       setSaved(null)
     }
   }
@@ -395,6 +398,8 @@ function Editor() {
           onMetadataChange={setMetadata}
           defaults={defaults}
           onDefaultsChange={setDefaults}
+          access={access}
+          onAccessChange={setAccess}
           problems={problems}
           onNodeChange={updateNode}
           onDelete={deleteNode}

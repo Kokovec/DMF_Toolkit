@@ -51,7 +51,7 @@ primitives still existed; the parameters now live on features). `media-primitive
   There is **no wiring between a module's functions**; how the functions are used and
   configured is set per instance in the workload (R8.4).
 - **R3.2 The palette is organised by company:** one heading per company (the catalog's vendor),
-  with its products (modules) under it, starting with Switchframe → Switchframe. A module's
+  with its products (modules) under it: Switchframe → Switchframe; DMF MXL → the test sources (R7.8). A module's
   categories (Acquisition, Distribution, Production…) remain descriptive tags (tooltip), not palette
   headings. *Enforced by:* `Catalog.byCompany` (`catalog.ts`), `Palette.tsx`; categories: `checkModule`.
 - **R3.8 Design rules live with the features in the library:** `attachTo` (where an add-on may
@@ -68,7 +68,8 @@ primitives still existed; the parameters now live on features). `media-primitive
   different types; the default), and each input can **scale out** up to a maximum number of copies
   per instance (1 = no scaling). In the workload, each instance picks its inputs and how many of
   each (default: the first input for "one", every input once for "several"). Unused inputs have no
-  ports or settings; each copy gets its own ports and settings (`srt1`, `srt1_2`, `srt1_3`…). The
+  ports or settings; each copy gets its own ports and settings (`srt1`, `srt1_2`, `srt1_3`…). A
+  module's `defaults.inputs` overrides that starting point (what it doesn't list starts unused). The
   published function carries the selection in force (`inputs`). Outputs: R3.15.
   *Enforced by:* `designProblems`, `inputSelectionProblems`, `instanceParts` (`compose.ts`);
   `withSelection`, `publishProblems` (`workload.ts`); Inputs tab (`FunctionDialog.tsx`).
@@ -80,10 +81,18 @@ primitives still existed; the parameters now live on features). `media-primitive
   feature ids), e.g. SRT/RTMP program outputs and recording need a program encoder; SCTE-104 needs
   an MXL source or MXL program output. *Enforced by:* `designProblems` (`compose.ts`).
 - **R3.15 Outputs scale out too.** An output block has a scale-out maximum like an input. Each
-  instance runs every output once by default and can turn an output off (0) or run several copies
-  (e.g. several SRT destinations), each with its own ports and settings. The published function
-  carries `outputs`. Functions without ports (e.g. recording) aren't counted.
+  instance runs every output once by default (or as the module's `defaults.outputs` says) and can
+  turn an output off (0) or run several copies (e.g. several SRT destinations), each with its own
+  ports and settings. The published function carries `outputs`. Functions without ports (e.g.
+  recording) aren't counted: they're turned off with R3.16.
   *Enforced by:* `outputSelectionProblems`, `instanceParts` (`compose.ts`); Outputs tab (`FunctionDialog.tsx`).
+- **R3.16 Other functions and add-ons can be optional** (`ModuleBlock.optional`: a default, and add-ons
+  by add-on key). Each instance turns them on or off (`features`, by block id or `<block>.<add-on
+  key>`); a function that's off has no tab, no parameters and isn't published, and an add-on of a
+  function that's off is off. Inputs and outputs use copies instead. What's left on must still have
+  what it requires (R3.14), checked per instance. The published function always carries the full
+  selection in force. *Enforced by:* `featuresOf`, `featureSelectionProblems`, `instanceDesign`
+  (`compose.ts`); `publishProblems`, `toPublished` (`workload.ts`); Features section (`FunctionDialog.tsx`).
 - **R3.3 One catalog per vendor.** The vendor name is mandatory and unique; catalog id =
   slug of the vendor name (e.g. "Acme Media" → `acme-media`). A module's vendor is its catalog's.
   *Enforced by:* `catalogProblems` (`src/model/modules.ts`), unique `catalogs.vendor` (`server/db.ts`).
@@ -95,7 +104,7 @@ primitives still existed; the parameters now live on features). `media-primitive
   - *Feature library* (`src/model/library.json`): categories, feature groups,
     features (parameters, ports, design rules) and the shared
     **vocabulary** (protocols with labels/aliases, MXL formats, External device kinds, reference
-    kinds). New features, protocols, formats or device kinds need a library change only, no code.
+    kinds, access roles). New features, protocols, formats or device kinds need a library change only, no code.
     *Loaded by:* `src/model/library.ts`, `src/model/vocabulary.ts`.
   - *Database*: vendor catalogs and modules, workloads.
 - **R3.7 The feature library is a versioned file in git, not editable in the UI.** It's the
@@ -109,14 +118,17 @@ primitives still existed; the parameters now live on features). `media-primitive
 
 ## 4. What a module contains
 
-- **R4.1 A module is only identity & categories and its design** (from which ports and core
-  parameters follow). *Enforced by:* `VendorModule` (`types.ts`), `checkModule`.
+- **R4.1 A module is only identity & categories, its design** (from which ports and core
+  parameters follow) **and starting values for a new instance** (`defaults`: inputs, outputs,
+  control, resources, discovery, and parameters over the schema's defaults; these aren't
+  infrastructure decisions, an instance can change them, and they apply only when it's created).
+  *Enforced by:* `VendorModule` (`types.ts`), `checkModule`, `newFunctionData`.
 - **R4.2 No placement or infrastructure on the module:** no image, licences, locality, edge
   interfaces or node constraints. Edge functions are inferred from external ports (`isEdge`).
 - **R4.3 Each function instance carries its own setup**, set in the workload designer
   (function dialog, Setup tab): vendor settings, control & health endpoints, dependencies (each bound to a facility
-  resource) and the resource profile. A health check is required, and so is a binding for every
-  required dependency. *Enforced by:* `setupProblems` (`workload.ts`), `FunctionSetup.tsx`.
+  resource) and the resource profile. They start from the module's `defaults`, else a health check of
+  `http 8080 /healthz`. A health check is required, and so is a binding for every required dependency. *Enforced by:* `setupProblems` (`workload.ts`), `FunctionSetup.tsx`.
 - **R4.4 Core parameters** are the features' common vocabulary: minimal, understood by the
   configurator (wiring, flow formats, vendor swaps).
 - **R4.5 Vendor settings are free-form JSON in the vendor's own names and structure** (typed in or
@@ -145,13 +157,23 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R5.6 Buffers are budgets, not sizes:** `maxLatencyMs`, flow `historyMs`.
 - **R5.7 Required values without a default** (e.g. a port) are for the designer to fill in.
   Publishing is blocked until they're set.
+- **R5.8 A parameter group can list the valid combinations of two fields** (`x-allowed`), so a choice
+  that's valid alone but not together is refused with a message naming the values (e.g. "2160p24 is
+  not a Switchframe format"), and the form offers only the valid values. A product can narrow a
+  shared feature the same way (`ModuleBlock.allowed`, by group path); if only one combination
+  is left, it becomes the default. *Enforced by:* `allowedProblem`, `validateValue`, `allowedChoices`
+  (`schema.ts`); `blockSchema` (`compose.ts`); `SchemaForm`.
+- **R5.9 A field's choices can come from the instance** (`x-options: "inputs"`: its input copies in
+  use). It must name a copy in use; unset means the first, and is published explicitly.
+  *Enforced by:* `optionPaths` (`schema.ts`), `optionProblems`, `withResolvedOptions` (`workload.ts`), `SchemaForm`.
 
 ## 6. Ports, wiring and flows
 
 - **R6.1 Module ports come from its blocks:** an input or output block gives one external port on
   its protocol; an MXL input or output block gives video, audio and ANC flows. For each, the
-  author chooses a video feed (with its audio and ANC) or an audio-only feed.
-  *Enforced by:* `composeModule`.
+  author chooses a video feed (with its audio and ANC) or an audio-only feed. A product whose MXL
+  block has no data flow says so (`ModuleBlock.noData`): it has video and audio ports and no ANC port,
+  so dragging a bundle can't create a data wire. *Enforced by:* `composeModule`, `designProblems`.
 - **R6.2 Flows are mono-essence;** a feed's video, audio and ANC flows share a time context and
   are drawn as one connection (expandable, to split audio from video).
 - **R6.3 A wire is source port → destination port.** An output can feed many inputs (one flow,
@@ -162,7 +184,9 @@ primitives still existed; the parameters now live on features). `media-primitive
   video feed or an audio-only feed. They're never deployed. They're identified by a logical
   **reference** (NMOS id, SDP name/address, SRT party, ZIXI stream, RTMP stream, NDI name).
   External devices connect only to an edge function's external port.
-- **R6.6 Every MXL output that's read becomes a published flow** with a stable UUID
+- **R6.6 The video and audio flows of every MXL output in use are always published** (a writer
+  needs its flow definition whether or not anything reads it yet, so `readers` may be empty); a data
+  flow only when read. Each has a stable UUID
   (`uuidV5(workload uid, writer)`), writer, readers, domain, an NMOS-style format, history depth
   and discovery metadata. The format comes from the writer's parameters tagged **`x-flow`**
   (frameSize, grainRate, interlace, colorspace, transfer, channelCount, sampleRate), else the
@@ -215,7 +239,20 @@ primitives still existed; the parameters now live on features). `media-primitive
   (trim, audio-follow-video, delay, high-pass, gate, 3-band EQ, compressor); upstream key
   (chroma / luma / neural). Feature settings come from Switchframe's flags and from the API calls
   that are configuration (format, captions mode, speech-to-text, master limiter, SCTE-35 default
-  rule, replay shutter angle, destinations, recording); run-time calls are excluded.
+  rule, replay shutter angle, destinations, recording); run-time calls are excluded. Security
+  settings (API and invite tokens, allowed origins) are the orchestrator's, not module settings.
+  An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`); recording declares
+  its storage (`storageGiB`, for the orchestrator). Captions are turned off with the feature toggle,
+  so their mode has no `off`. The MXL program output has no data flow (`noData`): at the pinned commit
+  the product opens no data writer for it; MXL sources keep their optional ANC port, which it reads.
+  Discovery defaults to `register: true` without `control.nmos`: the product doesn't register
+  itself, the facility's flow agent registers every flow.
+- **R7.8 Test sources are products too:** company **DMF MXL**, `dmf-mxl.1` "MXL test source"
+  (`mxl-gst-testsrc`: a `test.pattern` block and an MXL output) and `dmf-mxl.2` "A/V sync test
+  source" (`mxl-syncgen`: an MXL output, fixed at 1080p29.97 by R5.8). Neither writes data
+  (`noData`). `dmf-mxl.1` starts at 1080p29.97 through its `defaults.parameters`, matching a new
+  Switchframe engine; the shared `output.mxl` default is unchanged. Patterns are GStreamer
+  `videotestsrc` nicknames, confirmed against its documentation (2026-11-02).
 
 ## 8. Workloads and publishing
 
@@ -223,9 +260,13 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R8.2 Publishing = a saved revision that passes every check,** served at
   `GET /api/workloads/:id/published`. *Enforced by:* `publishProblems`, `server/app.ts`.
 - **R8.3 The workload description is the workflow intent** published to the orchestrator.
+- **R8.5 A workload says who may operate it** (`spec.access.roles`: usernames per role; Inspector →
+  Workload → Access). Roles come from the library's vocabulary: director, audio, graphics, captioner,
+  viewer. A director is required to publish, and usernames must match `^[A-Za-z0-9._-]+$`. Whether
+  a user exists is checked at deployment. *Enforced by:* `accessProblems`, `publishProblems` (`workload.ts`).
 - **R8.4 A function is configured in a pop-up dialog, opened by double-clicking its node** (or
   *Configure…* in the Inspector). Header tabs:
-  - **General** (name, MXL domain);
+  - **General** (name, MXL domain, and the Features section: R3.16);
   - **Inputs**: how many of each input type (within the product's input rules), then each copy's
     settings, chosen from a list;
   - **one tab per configurable feature** of the product (e.g. Switching engine, Program encoder,
@@ -243,7 +284,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 ## 9. Storage and deployment of the tool
 
 - **R9.1 One install per customer** (shared by that customer's team): library server + SQLite
-  (`data/`, git-ignored). Schema migrations run automatically (now schema v9; v5 modules are converted to designs).
+  (`data/`, git-ignored). Schema migrations run automatically (now schema v10; v5 modules are converted to designs; v10 drops stored module versions that no saved workload uses and that no longer match the library).
 - **R9.2 Dark theme only.**
 
 ---
@@ -292,6 +333,16 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-10-31 | Production switcher modelled on Switchframe: library sections (Common, Production switcher with inputs / outputs / features / add-ons; library 3.1.0), palette category Production, `requires` design rule, output scale-out and per-instance output selection; example catalog and product mapping for the future Docker/Terraform compile | R3.13–R3.15, R7.7 |
 | 2026-10-31 | No module designer: every module models a real product, defined in a catalog file (`scripts/product-catalogs.ts`) and imported; Modules tab removed. Functions are configured in a pop-up dialog (double-click) with a tab per feature, Inputs/Outputs tabs for how many of each and each copy's settings, and Setup/Intent tabs. Switchframe gets per-source setup, audio channel and key options and its other configuration API settings (library 3.2.1) | Supersedes R3.10, R3.11 and the module designer of R3.1; R3.1, R3.12, R8.4, R7.7 |
 | 2026-10-31 | Palette headings are company names, not categories (now tags); the first company and product are Switchframe → Switchframe. Product catalogs live in `catalogs/` and load at server start | R3.1, R3.2 |
+| 2026-11-02 | Stage 1 of the orchestration build (`switchframe-dmf/docs/orchestration/03-toolkit-spec.md` §1–7): `dmf-toolkit/v1alpha4`, library 4.0.0, `switchframe.1` 1.1.0, schema v10 | Below |
+| 2026-11-02 | Optional functions and add-ons, on or off per instance (`features`); `scte35.enabled` removed | R3.15, R3.16 |
+| 2026-11-02 | Modules carry starting values for a new instance (`defaults`) | R3.12, R4.1, R4.3 |
+| 2026-11-02 | Unread MXL outputs publish their video and audio flows; a data flow only when read | Changes R6.6 |
+| 2026-11-02 | Valid combinations of two fields (`x-allowed`), also narrowed per product (`ModuleBlock.allowed`). Resolves "Format presets" | R5.8 |
+| 2026-11-02 | On air at start (`x-options`), recording storage, required SRT stream ID; API/invite tokens and allowed origins removed from the module | R5.9, R7.7 |
+| 2026-11-02 | Workload access: usernames per role, a director required to publish | R8.5 |
+| 2026-11-02 | Test sources as products under company DMF MXL | R3.2, R7.8 |
+| 2026-11-02 | Blocks with no data flow (`noData`) on the test sources and Switchframe's `mxl-out`, so a bundle drag can't create a data wire the product can't serve; descriptions promising MXL VANC corrected | R6.1, R7.7, R7.8 |
+| 2026-11-02 | `defaults.discovery` and `defaults.parameters` for a new instance; `dmf-mxl.1` starts at 1080p29.97. Captions mode loses `off`. Reference workload `scripts/fixtures/studio-a.ts`. Library stays 4.0.0 and modules 1.1.0 / 1.0.0: none was committed or recorded by a real server, and no saved workload uses them | R4.1, R7.7, R7.8, R3.5, R3.7 |
 
 ## Open questions
 
@@ -311,7 +362,5 @@ primitives still existed; the parameters now live on features). `media-primitive
 - Parameters for the new inputs and outputs (addresses, ABR ladders, packaging settings).
 - With scale-out, should the copies of an input share settings (e.g. one SRT mode for all) or
   stay fully independent (current)?
-- Format presets: express valid resolution × rate combinations as a design rule (today only the
-  compiler can refuse e.g. 2160p24 for Switchframe)?
-- Example catalogs are regenerated from their designs after a library change. Should the server
+- Product catalogs are regenerated from their designs after a library change. Should the server
   recompute stored modules' derived ports/parameters when the library version changes?

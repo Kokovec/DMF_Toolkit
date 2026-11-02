@@ -1,8 +1,8 @@
 {
-  "apiVersion": "dmf-toolkit/v1alpha3",
+  "apiVersion": "dmf-toolkit/v1alpha4",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "3.2.1",
+    "version": "4.0.0",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -206,7 +206,33 @@
           "source": "stream name the source publishes under, e.g. cam-1",
           "destination": "stream name, e.g. program"
         }
-      ]
+      ],
+      "access": {
+        "roles": [
+          {
+            "id": "director",
+            "label": "Director",
+            "required": true
+          },
+          {
+            "id": "audio",
+            "label": "Audio"
+          },
+          {
+            "id": "graphics",
+            "label": "Graphics"
+          },
+          {
+            "id": "captioner",
+            "label": "Captioner"
+          },
+          {
+            "id": "viewer",
+            "label": "Viewer"
+          }
+        ],
+        "usernamePattern": "^[A-Za-z0-9._-]+$"
+      }
     },
     "categories": [
       {
@@ -267,6 +293,11 @@
       {
         "id": "packaging",
         "name": "Packaging outputs",
+        "section": "common"
+      },
+      {
+        "id": "testing",
+        "name": "Testing",
         "section": "common"
       },
       {
@@ -1049,8 +1080,11 @@
                     "type": "string",
                     "title": "Expected frame rate",
                     "enum": [
+                      "23.976",
+                      "24",
                       "25",
                       "29.97",
+                      "30",
                       "50",
                       "59.94",
                       "60"
@@ -1514,6 +1548,7 @@
             "required": [
               "mode",
               "address",
+              "streamId",
               "latencyMs"
             ],
             "properties": {
@@ -1540,7 +1575,8 @@
               "streamId": {
                 "type": "string",
                 "title": "Stream ID",
-                "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller)."
+                "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller). Letters, digits, _ and -, at most 64.",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$"
               },
               "latencyMs": {
                 "type": "integer",
@@ -2329,7 +2365,7 @@
         "name": "MXL program output",
         "group": "switcher-outputs",
         "kind": "block",
-        "description": "Publishes the programme uncompressed on MXL (V210 video, float32 audio, VANC data with captions and SCTE-104) in the programme format.",
+        "description": "Publishes the programme uncompressed on MXL (V210 video and float32 audio, no data flow) in the programme format.",
         "mxlOutputs": true
       },
       {
@@ -2390,8 +2426,19 @@
                 "type": "string",
                 "title": "File name prefix",
                 "default": "program"
+              },
+              "storageGiB": {
+                "type": "integer",
+                "title": "Storage (GiB)",
+                "description": "Space to set aside for recordings.",
+                "minimum": 1,
+                "default": 50,
+                "x-audience": "orchestrator"
               }
-            }
+            },
+            "required": [
+              "storageGiB"
+            ]
           }
         }
       },
@@ -2440,8 +2487,7 @@
                   "60"
                 ],
                 "default": "29.97",
-                "x-flow": "grainRate",
-                "description": "23.976 and 24 exist only at 1080."
+                "x-flow": "grainRate"
               },
               "scan": {
                 "type": "string",
@@ -2481,7 +2527,7 @@
                   "source-driven"
                 ],
                 "default": "off",
-                "description": "freerun: smooth output on its own clock; source-driven: lower latency."
+                "description": "freerun: smooth output on its own clock; source-driven: lower latency. Leave off for MXL sources; they are already locked to the facility clock, and freerun drops single frames."
               },
               "frameRateConversion": {
                 "type": "string",
@@ -2494,7 +2540,48 @@
                 ],
                 "default": "none",
                 "description": "For sources at another rate; mcfi = motion-compensated."
+              },
+              "onAirAtStart": {
+                "type": "string",
+                "title": "On air at start",
+                "description": "The input on air when nothing has been cut yet, so the programme flows are published from the start.",
+                "x-options": "inputs"
               }
+            },
+            "x-allowed": {
+              "fields": [
+                "resolution",
+                "rate"
+              ],
+              "values": {
+                "1920x1080": [
+                  "23.976",
+                  "24",
+                  "25",
+                  "29.97",
+                  "30",
+                  "50",
+                  "59.94",
+                  "60"
+                ],
+                "1280x720": [
+                  "25",
+                  "29.97",
+                  "30",
+                  "50",
+                  "59.94",
+                  "60"
+                ],
+                "3840x2160": [
+                  "25",
+                  "29.97",
+                  "30",
+                  "50",
+                  "59.94",
+                  "60"
+                ]
+              },
+              "message": "{resolution.height}p{rate} is not a Switchframe format"
             }
           }
         }
@@ -2653,7 +2740,7 @@
         "name": "Closed captions",
         "group": "switcher-features",
         "kind": "block",
-        "description": "CEA-608/708 captions on the programme: pass through the source's, or author them live. Embedded in H.264/HEVC (SEI) and in MXL VANC (ST 334).",
+        "description": "CEA-608/708 captions on the programme: pass through the source's, or author them live. Embedded in H.264/HEVC (SEI).",
         "key": "captions",
         "rules": {
           "maxPerModule": 1
@@ -2668,7 +2755,6 @@
                 "type": "string",
                 "title": "Mode",
                 "enum": [
-                  "off",
                   "passthrough",
                   "author"
                 ],
@@ -2695,34 +2781,19 @@
             "title": "SCTE-35",
             "x-audience": "function",
             "properties": {
-              "enabled": {
-                "type": "boolean",
-                "title": "Insert SCTE-35",
-                "default": true
-              },
               "pid": {
                 "type": "integer",
                 "title": "PID",
                 "minimum": 32,
                 "maximum": 8190,
-                "default": 258,
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                }
+                "default": 258
               },
               "prerollMs": {
                 "type": "integer",
                 "title": "Pre-roll (ms)",
                 "minimum": 0,
                 "maximum": 60000,
-                "default": 4000,
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                }
+                "default": 4000
               },
               "heartbeatMs": {
                 "type": "integer",
@@ -2730,31 +2801,16 @@
                 "description": "splice_null interval; 0 = off.",
                 "minimum": 0,
                 "maximum": 60000,
-                "default": 5000,
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                }
+                "default": 5000
               },
               "verify": {
                 "type": "boolean",
                 "title": "Verify each cue",
-                "default": true,
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                }
+                "default": true
               },
               "webhookUrl": {
                 "type": "string",
-                "title": "Event webhook URL",
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                }
+                "title": "Event webhook URL"
               },
               "defaultRule": {
                 "type": "string",
@@ -2765,11 +2821,6 @@
                   "rewrite"
                 ],
                 "default": "pass",
-                "x-when": {
-                  "enabled": [
-                    true
-                  ]
-                },
                 "description": "Signal conditioning default action."
               }
             }
@@ -2968,43 +3019,6 @@
                 "minimum": 100,
                 "maximum": 50000,
                 "default": 2000
-              },
-              "allowedOrigins": {
-                "type": "string",
-                "title": "Allowed browser origins",
-                "description": "Comma-separated; empty = any."
-              },
-              "access": {
-                "type": "object",
-                "title": "Access",
-                "properties": {
-                  "apiToken": {
-                    "type": "string",
-                    "title": "API token",
-                    "format": "secret-ref",
-                    "description": "Empty: one is generated at start."
-                  },
-                  "directorInvite": {
-                    "type": "string",
-                    "title": "Director invite token",
-                    "format": "secret-ref"
-                  },
-                  "audioInvite": {
-                    "type": "string",
-                    "title": "Audio operator invite token",
-                    "format": "secret-ref"
-                  },
-                  "graphicsInvite": {
-                    "type": "string",
-                    "title": "Graphics operator invite token",
-                    "format": "secret-ref"
-                  },
-                  "viewerInvite": {
-                    "type": "string",
-                    "title": "Viewer invite token",
-                    "format": "secret-ref"
-                  }
-                }
               }
             }
           }
@@ -3083,6 +3097,48 @@
               "message": "needs an MXL source or MXL program output"
             }
           ]
+        },
+        "key": "scte104"
+      },
+      {
+        "id": "test.pattern",
+        "name": "Test pattern",
+        "group": "testing",
+        "kind": "block",
+        "key": "pattern",
+        "description": "Generates a test picture and tone.",
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "title": "Test pattern",
+            "x-audience": "function",
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "title": "Pattern",
+                "enum": [
+                  "smpte",
+                  "ball",
+                  "snow",
+                  "black",
+                  "white",
+                  "red",
+                  "green",
+                  "blue",
+                  "checkers-8",
+                  "circular",
+                  "smpte75"
+                ],
+                "default": "smpte",
+                "description": "GStreamer videotestsrc pattern."
+              },
+              "overlayText": {
+                "type": "string",
+                "title": "Overlay text",
+                "description": "Text on the picture. Empty: the function's name."
+              }
+            }
+          }
         }
       }
     ]

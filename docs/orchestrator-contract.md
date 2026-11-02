@@ -30,14 +30,16 @@ brief maps to a field:
 | **Incoming stream bitrate + payload** (MPEG-TS, codecs) | `functions[].parameters.<block>.payload.pathA` / `.pathB` {bitrateMbps (required), container, videoCodec, audioCodec} | Function dialog → Expected payload |
 | **Network constraints** (exposure; per path `pathA` / `pathB` {network, zone, VLAN}), *for the orchestrator* | `functions[].parameters.<block>.network` (`x-audience: orchestrator`) | Function dialog → Network constraints |
 | **MXL flow definition**: domain, flow ID/UUID, essence formats, grain rate, history depth | `spec.flows[]`: `id` (UUID v5, stable across revisions), `domain`, `essence`, `format` (media type `video/v210` / `audio/float32` / `video/smpte291`, grain rate, frame size, interlace, colorspace, sample rate, channels), `historyMs` | Derived from the writer's output settings + workload defaults; overrides on the wire (Flow panel) |
-| **Connection graph**: MXL writer and readers, multi-hop | `spec.flows[].writer` / `.readers` (and `spec.wires` port → port, including external edges) | Canvas wiring |
+| **Connection graph**: MXL writer and readers, multi-hop | `spec.flows[].writer` / `.readers`, where `readers` may be empty: the video and audio flows of every MXL output in use are always published, a data flow only when read and only on a block that has one (and `spec.wires` port → port, including external edges) | Canvas wiring |
 | **Resource profile**: CPU/GPU, memory, network, storage | `functions[].resources` (per instance) | Function dialog → Resource profile |
 | **Scaling / resilience expectations** | `functions[].expectations` (`resilience`: none / 1+1 / N+1; `scaling`: fixed / elastic) | Function dialog → Expectations |
 | **Placement / constraints**: host/cluster, affinity, on-prem vs cloud, licensing | `functions[].placement` (`site`, `cluster`, `environment`, `with`, `apart`, `licensing`) | Function dialog → Placement constraints |
-| **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = the instance's control declares NMOS | Function dialog → Discovery; Flow panel |
+| **Discovery / control metadata**: NMOS registration, tags, labels | `functions[].discovery`, `spec.flows[].discovery` (`register`, `labels`); default `register` = the module's `defaults.discovery`, else whether the instance's control declares NMOS | Function dialog → Discovery; Flow panel |
 | Domain | `functions[].domain`, `spec.domains[]` | Function dialog → MXL domain |
 | **Inputs used** (which input functions run, and how many copies) | `functions[].inputs` (input block id → copies; 0 = not used); parameters and ports follow (copies: `srt1`, `srt1_2`, …) | Function dialog → Inputs |
 | **Outputs used** (which outputs run, and how many copies; 0 = off) | `functions[].outputs` (output block id → copies); parameters and ports follow (copies: `srt-out`, `srt-out_2`, …) | Function dialog → Outputs |
+| **Features used** (optional functions and add-ons on or off) | `functions[].features` (block id or `<block>.<add-on key>` → boolean): the full selection in force, including what's off. A function that's off has no parameters or tab | Function dialog → General → Features |
+| **Who may operate it** | `spec.access.roles` (role → usernames); roles offered come from the library; a `director` is required to publish. Whether a user exists is checked at deployment | Inspector → Workload → Access |
 | **Vendor settings** (the product's own configuration) | `functions[].settings` (free-form JSON, passed through) | Function dialog → *vendor* settings |
 | **Control & health** | `functions[].control` (`api`, `nmos`, `health`; health required) | Function dialog → Control & health |
 | **Dependencies** | `functions[].dependencies[]` (`name`, `kind`, `required`, `role`, `binding`) | Function dialog → Dependencies |
@@ -117,3 +119,8 @@ what the operator wants. The orchestrator chooses hosts, replicas, licences and 
 - **Per-instance setup** (2026-10-20): vendor settings, control & health, dependencies and the
   resource profile are set on each function instance (no longer on the module). Vendor settings
   are free-form JSON; there is no core → vendor mapping.
+- **Selections, access, unread flows** (2026-11-02, `dmf-toolkit/v1alpha4`, library 4.0.0): functions
+  carry `features` next to `inputs` and `outputs`, always the full selection in force; `spec.access`
+  says who may operate the workload; unread MXL outputs publish their video and audio flows with
+  empty `readers`; a field with `x-options` (e.g. `engine.engine.onAirAtStart`) is always published
+  with an explicit value.

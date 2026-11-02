@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { Catalog } from '../src/model/catalog'
+import { Catalog, checkModule } from '../src/model/catalog'
 import { catalogProblems } from '../src/model/modules'
 import { getFeature, LIBRARY } from '../src/model/library'
 import { feedOptions } from '../src/model/compose'
@@ -13,7 +13,7 @@ import { getPath } from '../src/model/schema'
 import { API_VERSION, type ModuleCatalog, type FeatureLibrary, type ControlSpec, type Dependency, type JsonValue, type ModuleBlock, type ModuleDesign, type ResourceProfile, type VendorModule, type WorkloadDescription } from '../src/model/types'
 
 // Bump when the schema or the stored document shapes change incompatibly.
-const SCHEMA_VERSION = 9
+const SCHEMA_VERSION = 10
 
 const SCHEMA = `
 -- Every feature library version this install has run with (the file lives in git).
@@ -108,6 +108,7 @@ export class Store {
       if (version <= 6) this.migrateFrom6()
       if (version <= 7) this.migrateFrom7()
       if (version <= 8) this.migrateFrom8()
+      if (version <= 9) this.migrateFrom9()
     }
     this.db.exec(SCHEMA)
     this.db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`)
@@ -219,6 +220,18 @@ export class Store {
         const design: ModuleDesign = { blocks, moduleFeatures: old.moduleFeatures ?? [], ...(old.layout ? { layout: old.layout as ModuleDesign['layout'] } : {}) }
         this.db.prepare('UPDATE modules SET document = ? WHERE id = ? AND version = ?').run(JSON.stringify(withDerived({ ...m, design })), r.id, r.version)
       }
+    })
+  }
+
+  // v9 -> v10: library 4.0.0 changes features modules are composed from. Stored versions no saved
+  // workload uses and that no longer match their design are dropped; product catalogs reload at
+  // start with the current version. One a workload uses is kept (R3.5).
+  private migrateFrom9() {
+    this.tx(() => {
+      const rows = this.db.prepare('SELECT id, version, document FROM modules').all() as { id: string; version: string; document: string }[]
+      for (const r of rows)
+        if (!this.isReferenced(r.id, r.version) && checkModule(JSON.parse(r.document)).length)
+          this.db.prepare('DELETE FROM modules WHERE id = ? AND version = ?').run(r.id, r.version)
     })
   }
 

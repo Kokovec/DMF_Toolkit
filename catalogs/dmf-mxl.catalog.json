@@ -1,0 +1,442 @@
+{
+  "apiVersion": "dmf-toolkit/v1alpha4",
+  "kind": "ModuleCatalog",
+  "metadata": {
+    "id": "dmf-mxl",
+    "name": "DMF MXL",
+    "version": "1",
+    "vendor": "DMF MXL"
+  },
+  "spec": {
+    "modules": [
+      {
+        "id": "dmf-mxl.1",
+        "version": "1.0.0",
+        "name": "MXL test source",
+        "description": "A test pattern and tone published on MXL (mxl-gst-testsrc).",
+        "categories": [
+          "acquisition"
+        ],
+        "vendor": "DMF MXL",
+        "product": "mxl-gst-testsrc",
+        "capability": {
+          "produces": [
+            "video",
+            "audio"
+          ],
+          "consumes": [],
+          "scaling": "singleton"
+        },
+        "design": {
+          "blocks": [
+            {
+              "id": "pattern",
+              "feature": "test.pattern",
+              "addons": []
+            },
+            {
+              "id": "mxl",
+              "feature": "output.mxl",
+              "addons": [],
+              "scaleOut": 1,
+              "noData": true
+            }
+          ],
+          "moduleFeatures": []
+        },
+        "ports": [
+          {
+            "id": "mxl.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "formats": [
+              "video/v210"
+            ],
+            "timeContext": "mxl",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "formats": [
+              "audio/float32"
+            ],
+            "timeContext": "mxl",
+            "transport": "mxl"
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "title": "Test pattern · pattern",
+                "properties": {
+                  "pattern": {
+                    "type": "object",
+                    "title": "Test pattern",
+                    "x-audience": "function",
+                    "properties": {
+                      "pattern": {
+                        "type": "string",
+                        "title": "Pattern",
+                        "enum": [
+                          "smpte",
+                          "ball",
+                          "snow",
+                          "black",
+                          "white",
+                          "red",
+                          "green",
+                          "blue",
+                          "checkers-8",
+                          "circular",
+                          "smpte75"
+                        ],
+                        "default": "smpte",
+                        "description": "GStreamer videotestsrc pattern."
+                      },
+                      "overlayText": {
+                        "type": "string",
+                        "title": "Overlay text",
+                        "description": "Text on the picture. Empty: the function's name."
+                      }
+                    }
+                  }
+                }
+              },
+              "mxl": {
+                "type": "object",
+                "title": "MXL output · mxl",
+                "properties": {
+                  "format": {
+                    "type": "object",
+                    "title": "Output format",
+                    "x-audience": "function",
+                    "properties": {
+                      "video": {
+                        "type": "object",
+                        "title": "Output video format",
+                        "properties": {
+                          "frameSize": {
+                            "type": "string",
+                            "title": "Expected frame size",
+                            "enum": [
+                              "1280x720",
+                              "1920x1080",
+                              "3840x2160"
+                            ],
+                            "default": "1920x1080",
+                            "x-flow": "frameSize"
+                          },
+                          "rate": {
+                            "type": "string",
+                            "title": "Expected frame rate",
+                            "enum": [
+                              "23.976",
+                              "24",
+                              "25",
+                              "29.97",
+                              "30",
+                              "50",
+                              "59.94",
+                              "60"
+                            ],
+                            "default": "50",
+                            "x-flow": "grainRate"
+                          },
+                          "scan": {
+                            "type": "string",
+                            "title": "Scan",
+                            "enum": [
+                              "progressive",
+                              "interlaced"
+                            ],
+                            "default": "progressive",
+                            "x-flow": "interlace"
+                          },
+                          "colorspace": {
+                            "type": "string",
+                            "title": "Colorspace",
+                            "enum": [
+                              "BT709",
+                              "BT2020",
+                              "BT2100"
+                            ],
+                            "default": "BT709",
+                            "x-flow": "colorspace"
+                          },
+                          "transfer": {
+                            "type": "string",
+                            "title": "Transfer",
+                            "enum": [
+                              "SDR",
+                              "HLG",
+                              "PQ"
+                            ],
+                            "default": "SDR",
+                            "x-flow": "transfer"
+                          }
+                        },
+                        "description": "Format the receiver normalizes to; becomes the MXL video flow definition.",
+                        "x-audience": "function"
+                      },
+                      "audio": {
+                        "type": "object",
+                        "title": "Output audio",
+                        "properties": {
+                          "channels": {
+                            "type": "integer",
+                            "title": "Channels",
+                            "minimum": 1,
+                            "maximum": 64,
+                            "default": 2,
+                            "x-flow": "channelCount"
+                          }
+                        },
+                        "description": "Channel count published on the audio flow.",
+                        "x-audience": "function"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "defaults": {
+          "outputs": {
+            "mxl": 1
+          },
+          "control": {
+            "health": {
+              "type": "exec"
+            }
+          },
+          "resources": {
+            "cpu": 0.25,
+            "memoryMiB": 256
+          },
+          "discovery": {
+            "register": true
+          },
+          "parameters": {
+            "mxl": {
+              "format": {
+                "video": {
+                  "frameSize": "1920x1080",
+                  "rate": "29.97"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "dmf-mxl.2",
+        "version": "1.0.0",
+        "name": "A/V sync test source",
+        "description": "A white frame and a 1 kHz beep every 30 frames, published on MXL (mxl-syncgen).",
+        "categories": [
+          "acquisition"
+        ],
+        "vendor": "DMF MXL",
+        "product": "mxl-syncgen",
+        "capability": {
+          "produces": [
+            "video",
+            "audio"
+          ],
+          "consumes": [],
+          "scaling": "singleton"
+        },
+        "design": {
+          "blocks": [
+            {
+              "id": "mxl",
+              "feature": "output.mxl",
+              "addons": [],
+              "scaleOut": 1,
+              "noData": true,
+              "allowed": {
+                "format.video": {
+                  "fields": [
+                    "frameSize",
+                    "rate"
+                  ],
+                  "values": {
+                    "1920x1080": [
+                      "29.97"
+                    ]
+                  },
+                  "message": "{frameSize.height}p{rate} is not available: the A/V sync test source only runs at 1080p29.97"
+                }
+              }
+            }
+          ],
+          "moduleFeatures": []
+        },
+        "ports": [
+          {
+            "id": "mxl.video",
+            "direction": "out",
+            "essence": "video",
+            "cardinality": "0..1",
+            "formats": [
+              "video/v210"
+            ],
+            "timeContext": "mxl",
+            "transport": "mxl"
+          },
+          {
+            "id": "mxl.audio",
+            "direction": "out",
+            "essence": "audio",
+            "cardinality": "0..1",
+            "formats": [
+              "audio/float32"
+            ],
+            "timeContext": "mxl",
+            "transport": "mxl"
+          }
+        ],
+        "parameters": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "mxl": {
+                "type": "object",
+                "title": "MXL output · mxl",
+                "properties": {
+                  "format": {
+                    "type": "object",
+                    "title": "Output format",
+                    "x-audience": "function",
+                    "properties": {
+                      "video": {
+                        "type": "object",
+                        "title": "Output video format",
+                        "properties": {
+                          "frameSize": {
+                            "type": "string",
+                            "title": "Expected frame size",
+                            "enum": [
+                              "1280x720",
+                              "1920x1080",
+                              "3840x2160"
+                            ],
+                            "default": "1920x1080",
+                            "x-flow": "frameSize"
+                          },
+                          "rate": {
+                            "type": "string",
+                            "title": "Expected frame rate",
+                            "enum": [
+                              "23.976",
+                              "24",
+                              "25",
+                              "29.97",
+                              "30",
+                              "50",
+                              "59.94",
+                              "60"
+                            ],
+                            "default": "29.97",
+                            "x-flow": "grainRate"
+                          },
+                          "scan": {
+                            "type": "string",
+                            "title": "Scan",
+                            "enum": [
+                              "progressive",
+                              "interlaced"
+                            ],
+                            "default": "progressive",
+                            "x-flow": "interlace"
+                          },
+                          "colorspace": {
+                            "type": "string",
+                            "title": "Colorspace",
+                            "enum": [
+                              "BT709",
+                              "BT2020",
+                              "BT2100"
+                            ],
+                            "default": "BT709",
+                            "x-flow": "colorspace"
+                          },
+                          "transfer": {
+                            "type": "string",
+                            "title": "Transfer",
+                            "enum": [
+                              "SDR",
+                              "HLG",
+                              "PQ"
+                            ],
+                            "default": "SDR",
+                            "x-flow": "transfer"
+                          }
+                        },
+                        "description": "Format the receiver normalizes to; becomes the MXL video flow definition.",
+                        "x-audience": "function",
+                        "x-allowed": {
+                          "fields": [
+                            "frameSize",
+                            "rate"
+                          ],
+                          "values": {
+                            "1920x1080": [
+                              "29.97"
+                            ]
+                          },
+                          "message": "{frameSize.height}p{rate} is not available: the A/V sync test source only runs at 1080p29.97"
+                        }
+                      },
+                      "audio": {
+                        "type": "object",
+                        "title": "Output audio",
+                        "properties": {
+                          "channels": {
+                            "type": "integer",
+                            "title": "Channels",
+                            "minimum": 1,
+                            "maximum": 64,
+                            "default": 2,
+                            "x-flow": "channelCount"
+                          }
+                        },
+                        "description": "Channel count published on the audio flow.",
+                        "x-audience": "function"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "defaults": {
+          "outputs": {
+            "mxl": 1
+          },
+          "control": {
+            "health": {
+              "type": "exec"
+            }
+          },
+          "resources": {
+            "cpu": 0.25,
+            "memoryMiB": 256
+          },
+          "discovery": {
+            "register": true
+          }
+        }
+      }
+    ]
+  }
+}

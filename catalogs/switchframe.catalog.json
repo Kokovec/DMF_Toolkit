@@ -1,5 +1,5 @@
 {
-  "apiVersion": "dmf-toolkit/v1alpha3",
+  "apiVersion": "dmf-toolkit/v1alpha4",
   "kind": "ModuleCatalog",
   "metadata": {
     "id": "switchframe",
@@ -11,7 +11,7 @@
     "modules": [
       {
         "id": "switchframe.1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "name": "Switchframe",
         "description": "Browser-operated live production switcher: SRT, MoQ, MXL and ST 2110 sources; switching, transitions, audio mixing, keying and DVE, graphics, colour grading, captions (with AI speech-to-text), SCTE-35/104, instant replay, clip players and playout; programme out over SRT, RTMP, MXL, ST 2110 and to recording. GPU-accelerated when the host has one.",
         "categories": [
@@ -23,8 +23,7 @@
         "capability": {
           "produces": [
             "video",
-            "audio",
-            "data"
+            "audio"
           ],
           "consumes": [
             "video",
@@ -108,19 +107,34 @@
               "feature": "switcher.captions",
               "addons": [
                 "switcher.asr"
-              ]
+              ],
+              "optional": {
+                "default": false,
+                "addons": {
+                  "asr": false
+                }
+              }
             },
             {
               "id": "scte35",
               "feature": "switcher.scte35",
               "addons": [
                 "switcher.scte104"
-              ]
+              ],
+              "optional": {
+                "default": false,
+                "addons": {
+                  "scte104": false
+                }
+              }
             },
             {
               "id": "replay",
               "feature": "switcher.replay",
-              "addons": []
+              "addons": [],
+              "optional": {
+                "default": true
+              }
             },
             {
               "id": "clips",
@@ -130,12 +144,18 @@
             {
               "id": "playout",
               "feature": "switcher.playout",
-              "addons": []
+              "addons": [],
+              "optional": {
+                "default": false
+              }
             },
             {
               "id": "ai-segment",
               "feature": "switcher.ai-segment",
-              "addons": []
+              "addons": [],
+              "optional": {
+                "default": false
+              }
             },
             {
               "id": "comms",
@@ -162,7 +182,8 @@
             {
               "id": "mxl-out",
               "feature": "switcher.output.mxl",
-              "addons": []
+              "addons": [],
+              "noData": true
             },
             {
               "id": "st2110-out",
@@ -172,7 +193,10 @@
             {
               "id": "recording",
               "feature": "switcher.output.recording",
-              "addons": []
+              "addons": [],
+              "optional": {
+                "default": false
+              }
             }
           ],
           "moduleFeatures": [],
@@ -295,17 +319,6 @@
             "transport": "mxl"
           },
           {
-            "id": "mxl-out.anc",
-            "direction": "out",
-            "essence": "data",
-            "cardinality": "0..1",
-            "formats": [
-              "video/smpte291"
-            ],
-            "timeContext": "mxl-out",
-            "transport": "mxl"
-          },
-          {
             "id": "st2110-out.out.video",
             "direction": "out",
             "essence": "video",
@@ -333,6 +346,7 @@
                     "required": [
                       "mode",
                       "address",
+                      "streamId",
                       "latencyMs"
                     ],
                     "properties": {
@@ -359,7 +373,8 @@
                       "streamId": {
                         "type": "string",
                         "title": "Stream ID",
-                        "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller)."
+                        "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller). Letters, digits, _ and -, at most 64.",
+                        "pattern": "^[A-Za-z0-9_-]{1,64}$"
                       },
                       "latencyMs": {
                         "type": "integer",
@@ -2849,8 +2864,7 @@
                           "60"
                         ],
                         "default": "29.97",
-                        "x-flow": "grainRate",
-                        "description": "23.976 and 24 exist only at 1080."
+                        "x-flow": "grainRate"
                       },
                       "scan": {
                         "type": "string",
@@ -2890,7 +2904,7 @@
                           "source-driven"
                         ],
                         "default": "off",
-                        "description": "freerun: smooth output on its own clock; source-driven: lower latency."
+                        "description": "freerun: smooth output on its own clock; source-driven: lower latency. Leave off for MXL sources; they are already locked to the facility clock, and freerun drops single frames."
                       },
                       "frameRateConversion": {
                         "type": "string",
@@ -2903,7 +2917,48 @@
                         ],
                         "default": "none",
                         "description": "For sources at another rate; mcfi = motion-compensated."
+                      },
+                      "onAirAtStart": {
+                        "type": "string",
+                        "title": "On air at start",
+                        "description": "The input on air when nothing has been cut yet, so the programme flows are published from the start.",
+                        "x-options": "inputs"
                       }
+                    },
+                    "x-allowed": {
+                      "fields": [
+                        "resolution",
+                        "rate"
+                      ],
+                      "values": {
+                        "1920x1080": [
+                          "23.976",
+                          "24",
+                          "25",
+                          "29.97",
+                          "30",
+                          "50",
+                          "59.94",
+                          "60"
+                        ],
+                        "1280x720": [
+                          "25",
+                          "29.97",
+                          "30",
+                          "50",
+                          "59.94",
+                          "60"
+                        ],
+                        "3840x2160": [
+                          "25",
+                          "29.97",
+                          "30",
+                          "50",
+                          "59.94",
+                          "60"
+                        ]
+                      },
+                      "message": "{resolution.height}p{rate} is not a Switchframe format"
                     }
                   }
                 }
@@ -2999,7 +3054,6 @@
                         "type": "string",
                         "title": "Mode",
                         "enum": [
-                          "off",
                           "passthrough",
                           "author"
                         ],
@@ -3056,34 +3110,19 @@
                     "title": "SCTE-35",
                     "x-audience": "function",
                     "properties": {
-                      "enabled": {
-                        "type": "boolean",
-                        "title": "Insert SCTE-35",
-                        "default": true
-                      },
                       "pid": {
                         "type": "integer",
                         "title": "PID",
                         "minimum": 32,
                         "maximum": 8190,
-                        "default": 258,
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        }
+                        "default": 258
                       },
                       "prerollMs": {
                         "type": "integer",
                         "title": "Pre-roll (ms)",
                         "minimum": 0,
                         "maximum": 60000,
-                        "default": 4000,
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        }
+                        "default": 4000
                       },
                       "heartbeatMs": {
                         "type": "integer",
@@ -3091,31 +3130,16 @@
                         "description": "splice_null interval; 0 = off.",
                         "minimum": 0,
                         "maximum": 60000,
-                        "default": 5000,
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        }
+                        "default": 5000
                       },
                       "verify": {
                         "type": "boolean",
                         "title": "Verify each cue",
-                        "default": true,
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        }
+                        "default": true
                       },
                       "webhookUrl": {
                         "type": "string",
-                        "title": "Event webhook URL",
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        }
+                        "title": "Event webhook URL"
                       },
                       "defaultRule": {
                         "type": "string",
@@ -3126,11 +3150,6 @@
                           "rewrite"
                         ],
                         "default": "pass",
-                        "x-when": {
-                          "enabled": [
-                            true
-                          ]
-                        },
                         "description": "Signal conditioning default action."
                       }
                     }
@@ -3278,43 +3297,6 @@
                         "minimum": 100,
                         "maximum": 50000,
                         "default": 2000
-                      },
-                      "allowedOrigins": {
-                        "type": "string",
-                        "title": "Allowed browser origins",
-                        "description": "Comma-separated; empty = any."
-                      },
-                      "access": {
-                        "type": "object",
-                        "title": "Access",
-                        "properties": {
-                          "apiToken": {
-                            "type": "string",
-                            "title": "API token",
-                            "format": "secret-ref",
-                            "description": "Empty: one is generated at start."
-                          },
-                          "directorInvite": {
-                            "type": "string",
-                            "title": "Director invite token",
-                            "format": "secret-ref"
-                          },
-                          "audioInvite": {
-                            "type": "string",
-                            "title": "Audio operator invite token",
-                            "format": "secret-ref"
-                          },
-                          "graphicsInvite": {
-                            "type": "string",
-                            "title": "Graphics operator invite token",
-                            "format": "secret-ref"
-                          },
-                          "viewerInvite": {
-                            "type": "string",
-                            "title": "Viewer invite token",
-                            "format": "secret-ref"
-                          }
-                        }
                       }
                     }
                   },
@@ -3555,12 +3537,45 @@
                         "type": "string",
                         "title": "File name prefix",
                         "default": "program"
+                      },
+                      "storageGiB": {
+                        "type": "integer",
+                        "title": "Storage (GiB)",
+                        "description": "Space to set aside for recordings.",
+                        "minimum": 1,
+                        "default": 50,
+                        "x-audience": "orchestrator"
                       }
-                    }
+                    },
+                    "required": [
+                      "storageGiB"
+                    ]
                   }
                 }
               }
             }
+          }
+        },
+        "defaults": {
+          "inputs": {
+            "mxl-src": 1
+          },
+          "outputs": {
+            "mxl-out": 1
+          },
+          "control": {
+            "health": {
+              "type": "http",
+              "port": 9090,
+              "path": "/health"
+            }
+          },
+          "resources": {
+            "cpu": 2,
+            "memoryMiB": 4096
+          },
+          "discovery": {
+            "register": true
           }
         }
       }

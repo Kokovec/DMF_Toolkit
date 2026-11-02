@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useCatalog } from '../api'
 import { EXTERNALS, REFERENCE_KINDS } from '../model/externals'
-import { getCategory } from '../model/library'
+import { getCategory, LIBRARY } from '../model/library'
 import { leafPaths } from '../model/schema'
-import type { Colorspace, ExternalRefKind, ExternalReference, FlowDef, FlowOptions, VendorModule, WorkloadDefaults } from '../model/types'
+import type { Colorspace, ExternalRefKind, ExternalReference, FlowDef, FlowOptions, VendorModule, WorkloadAccess, WorkloadDefaults } from '../model/types'
 import { DEFAULT_HISTORY_MS, moduleOf, rebind, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
 
 type Props = {
@@ -11,6 +12,8 @@ type Props = {
   onMetadataChange: (m: WorkloadMeta) => void
   defaults: WorkloadDefaults
   onDefaultsChange: (d: WorkloadDefaults) => void
+  access?: WorkloadAccess
+  onAccessChange: (a: WorkloadAccess | undefined) => void
   problems: string[]
   onNodeChange: (id: string, data: FnData | ExtData) => void
   onDelete: (id: string) => void
@@ -46,7 +49,7 @@ const SIZES = [
   { width: 3840, height: 2160 },
 ]
 
-function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefaultsChange, problems }: Props) {
+function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefaultsChange, access, onAccessChange, problems }: Props) {
   const rate = RATES.find((r) => r.num * defaults.video.grainRate.den === defaults.video.grainRate.num * r.den)
   const setVideo = (patch: Partial<WorkloadDefaults['video']>) => onDefaultsChange({ ...defaults, video: { ...defaults.video, ...patch } })
   const setAudio = (patch: Partial<WorkloadDefaults['audio']>) => onDefaultsChange({ ...defaults, audio: { ...defaults.audio, ...patch } })
@@ -72,6 +75,26 @@ function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefau
         />
         <span className="hint">Passed to the orchestrator as the description of the path.</span>
       </label>
+
+      <h3>Access</h3>
+      <p className="hint">Usernames per role, separated by commas. Whether a user exists is checked at deployment.</p>
+      {LIBRARY.spec.vocabulary.access.roles.map((r) => (
+        <label key={r.id} className="field">
+          <span>
+            {r.label}
+            {r.required && <span className="required">*</span>}
+          </span>
+          <RoleMembers
+            value={access?.roles?.[r.id] ?? []}
+            onChange={(users) => {
+              const roles = { ...access?.roles }
+              if (users.length) roles[r.id] = users
+              else delete roles[r.id]
+              onAccessChange(Object.keys(roles).length ? { roles } : undefined)
+            }}
+          />
+        </label>
+      ))}
 
       <h3>Flow defaults</h3>
       <p className="hint">Used by the orchestrator where port formats leave a choice.</p>
@@ -144,6 +167,22 @@ function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefau
         <p className="ok-text">Ready to publish.</p>
       )}
     </aside>
+  )
+}
+
+// A role's usernames; keeps the raw text while typing and resyncs when the value changes from outside.
+function RoleMembers({ value, onChange }: { value: string[]; onChange: (users: string[]) => void }) {
+  const parse = (t: string) => t.split(',').map((u) => u.trim()).filter(Boolean)
+  const [text, setText] = useState(value.join(', '))
+  if (parse(text).join() !== value.join()) setText(value.join(', '))
+  return (
+    <input
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(parse(e.target.value))
+      }}
+    />
   )
 }
 

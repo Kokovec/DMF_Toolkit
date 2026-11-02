@@ -79,7 +79,7 @@ primitives still existed; the parameters now live on features). `media-primitive
   *Enforced by:* `checkLibrary` (`library.ts`).
 - **R3.14 A feature can require another function in the module** (`rules.requires`: any of these
   feature ids), e.g. SRT/RTMP program outputs and recording need a program encoder; SCTE-104 needs
-  an MXL source or MXL program output. *Enforced by:* `designProblems` (`compose.ts`).
+  an MXL source. *Enforced by:* `designProblems` (`compose.ts`).
 - **R3.15 Outputs scale out too.** An output block has a scale-out maximum like an input. Each
   instance runs every output once by default (or as the module's `defaults.outputs` says) and can
   turn an output off (0) or run several copies (e.g. several SRT destinations), each with its own
@@ -244,7 +244,9 @@ primitives still existed; the parameters now live on features). `media-primitive
   An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`); recording declares
   its storage (`storageGiB`, for the orchestrator). Captions are turned off with the feature toggle,
   so their mode has no `off`. The MXL program output has no data flow (`noData`): at the pinned commit
-  the product opens no data writer for it; MXL sources keep their optional ANC port, which it reads.
+  the product passes no data writer to it, so its attempts to write captions and SCTE-104 fail
+  ("no data writer set"). MXL sources keep their optional ANC port, which it reads: that's where
+  SCTE-104 comes from, translated to SCTE-35.
   Discovery defaults to `register: true` without `control.nmos`: the product doesn't register
   itself, the facility's flow agent registers every flow.
 - **R7.8 Test sources are products too:** company **DMF MXL**, `dmf-mxl.1` "MXL test source"
@@ -343,6 +345,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-02 | Test sources as products under company DMF MXL | R3.2, R7.8 |
 | 2026-11-02 | Blocks with no data flow (`noData`) on the test sources and Switchframe's `mxl-out`, so a bundle drag can't create a data wire the product can't serve; descriptions promising MXL VANC corrected | R6.1, R7.7, R7.8 |
 | 2026-11-02 | `defaults.discovery` and `defaults.parameters` for a new instance; `dmf-mxl.1` starts at 1080p29.97. Captions mode loses `off`. Reference workload `scripts/fixtures/studio-a.ts`. Library stays 4.0.0 and modules 1.1.0 / 1.0.0: none was committed or recorded by a real server, and no saved workload uses them | R4.1, R7.7, R7.8, R3.5, R3.7 |
+| 2026-11-02 | SCTE-104 only reads: it requires an MXL source, since writing to the programme fails without a data writer. Library 4.0.1: a real server had recorded 4.0.0, so R3.7 requires the bump. Modules stay 1.1.0 / 1.0.0: their stored parts don't change | R3.14, R7.7, R3.7 |
 
 ## Open questions
 

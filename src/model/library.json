@@ -2,7 +2,7 @@
   "apiVersion": "dmf-toolkit/v1alpha4",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "4.0.0",
+    "version": "4.0.1",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -3082,7 +3082,7 @@
         "name": "SCTE-104 on MXL",
         "group": "switcher-addons",
         "kind": "addon",
-        "description": "Reads and writes SCTE-104 automation messages on MXL data flows, translated to and from SCTE-35.",
+        "description": "Reads SCTE-104 automation messages from MXL data flows, translated to SCTE-35.",
         "rules": {
           "attachTo": [
             "switcher.scte35"
@@ -3091,10 +3091,9 @@
           "requires": [
             {
               "anyOf": [
-                "switcher.input.mxl",
-                "switcher.output.mxl"
+                "switcher.input.mxl"
               ],
-              "message": "needs an MXL source or MXL program output"
+              "message": "needs an MXL source"
             }
           ]
         },

@@ -51,7 +51,7 @@ The feature library has a **Production switcher** section with these groups. The
   settings. They're listed so the module describes the whole product.
 - Design rules:
   - the SRT/RTMP outputs and recording need the Program encoder;
-  - SCTE-104 needs an MXL source or MXL program output;
+  - SCTE-104 needs an MXL source;
   - the encoder needs at least one codec;
   - resolution × rate must be a Switchframe format (`x-allowed`): 1080p at 23.976, 24, 25, 29.97, 30, 50,
     59.94, 60; 720p and 2160p at 25, 29.97, 30, 50, 59.94, 60;
@@ -72,7 +72,7 @@ are resolved by the orchestrator.
 | `engine.engine.frameRateConversion` | `--frc-quality` | |
 | `engine.engine.onAirAtStart` | Cut to that source's key when nothing is on air | Programme flows are only published with a source on air |
 | `mxl-src` copies (wires) | `--mxl-sources video:audio[:data]` | Flow IDs from the wires. The optional `anc` port is the data flow, which the product reads |
-| `mxl-out` copies (0 or 1) | `--mxl-output`, `--mxl-output-video-def`, `--mxl-output-audio-def` | From the published `flows`; its video and audio flows are published even when unread. No data flow (`noData`): `server/cmd/switchframe` opens no data writer for the programme, so captions and SCTE-104 don't reach MXL output |
+| `mxl-out` copies (0 or 1) | `--mxl-output`, `--mxl-output-video-def`, `--mxl-output-audio-def` | From the published `flows`; its video and audio flows are published even when unread. No data flow (`noData`): `StartLifecycle` gets no data writer (`app.go:1486`), so the product's attempts to write captions and SCTE-104 to it fail with "no data writer set" |
 | SRT source, mode `listener` | `--srt-listen` (one shared listener, port allocated) | Key `srt:<streamId>` |
 | SRT source, mode `caller`: `address`, `streamId`, `latencyMs`, `inputBandwidthMbps`, `overheadPercent` | `POST /api/sources` once | `inputBW` = Mbit/s × 125 000 |
 | SRT source `latencyMs` (listener) | Most common value to `--srt-latency` | Others: `PUT /api/sources/{key}/srt` |
@@ -100,7 +100,7 @@ are resolved by the orchestrator.
 | `captions.asr` on; `captions.asr.*` | `--asr-sidecar`, `--asr-default-backend`; `PUT /api/asr/config` `{backend, modelName, confidence, speakerDetection}` | Needs an image with the sidecar |
 | `scte35` on; `scte35.scte35.pid`, `prerollMs`, `heartbeatMs`, `verify`, `webhookUrl` | `--scte35`, `--scte35-pid`, `--scte35-preroll`, `--scte35-heartbeat`, `--scte35-verify`, `--scte35-webhook` | |
 | `scte35.scte35.defaultRule` | `PUT /api/scte35/rules/default` `{action}` | |
-| `scte35.scte104` on | `--scte104` | Needs an MXL copy in use, and MXL data flows |
+| `scte35.scte104` on | `--scte104` | Reads SCTE-104 from an MXL source's data flow (`app.go:1295`), translated to SCTE-35. Needs an `mxl-src` copy in use. Writing isn't available: the product attempts it (`app.go:1564`) but it fails with "no data writer set" |
 | `playout` on; `playout.playout.cacheMaxGB` / `asRunRetentionDays` | `--playout`, `--playout-cache-max` / `--playout-asrun-retention` | |
 | `control.control.preview*` | `--preview-proxy`, `--preview-resolution`, `--preview-bitrate` (bit/s) | |
 | `control.control.relay*` | `--relay-resolution`, `--relay-bitrate` (bit/s) | |

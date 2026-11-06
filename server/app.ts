@@ -2,9 +2,10 @@
 // the downstream DMF orchestrator pulls.
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { checkCatalog, checkModule, ID_RE } from '../src/model/catalog'
-import type { ModuleCatalog, VendorModule, WorkloadDescription } from '../src/model/types'
+import { INSTANCE_ID_RE, type ModuleCatalog, type VendorModule, type WorkloadDescription } from '../src/model/types'
 import { LIBRARY } from '../src/model/library'
 import { checkWorkload, publishProblems, toPublished } from '../src/model/workload'
+import { toWorkloadXml, XmlEncodeError } from '../src/model/xml'
 import { HttpError, Store } from './db'
 
 type Handler = (ctx: { params: string[]; query: URLSearchParams; body: () => Promise<unknown> }) => unknown
@@ -56,7 +57,7 @@ export function createApp(store: Store) {
   route('GET', '/api/workloads/:id/revisions/:rev', ({ params: [id, rev] }) => store.getWorkload(id, Number(rev)))
   route('PUT', '/api/workloads/:id', async ({ params: [id], query, body }) => {
     const doc = (await body()) as WorkloadDescription
-    if (!ID_RE.test(id)) throw new HttpError(400, 'workload id must be lowercase letters, digits, . _ -')
+    if (!INSTANCE_ID_RE.test(id)) throw new HttpError(400, 'workload id must be lowercase letters, digits and -, not starting or ending with -, at most 42 characters')
     if (doc?.metadata?.id !== id) throw new HttpError(400, `metadata.id must be "${id}"`)
     const problems = checkWorkload(doc, store.catalog())
     if (problems.length) throw new HttpError(400, 'invalid workload', problems)
@@ -69,12 +70,23 @@ export function createApp(store: Store) {
   })
 
   // The published graph for the orchestrator: latest revision (or ?revision=N), only if complete.
-  route('GET', '/api/workloads/:id/published', ({ params: [id], query }) => {
+  const published = (id: string, query: URLSearchParams) => {
     const rev = query.get('revision')
     const { revision, document } = store.getWorkload(id, rev === null ? undefined : Number(rev))
     const problems = publishProblems(document, store.catalog())
     if (problems.length) throw new HttpError(422, `revision ${revision} is not publishable`, problems)
     return toPublished(document, revision, store.catalog())
+  }
+  route('GET', '/api/workloads/:id/published', ({ params: [id], query }) => published(id, query))
+  // The same, as XML (the orchestrator's handover format). Same checks; a document XML can't carry is also 422.
+  route('GET', '/api/workloads/:id/published\\.xml', ({ params: [id], query }) => {
+    const doc = published(id, query)
+    try {
+      return new Raw('application/xml; charset=utf-8', toWorkloadXml(doc))
+    } catch (e) {
+      if (e instanceof XmlEncodeError) throw new HttpError(422, `revision ${doc.metadata.revision} can't be published as XML`, e.problems)
+      throw e
+    }
   })
 
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -85,7 +97,10 @@ export function createApp(store: Store) {
       if (!r) throw new HttpError(candidates.length ? 405 : 404, candidates.length ? 'method not allowed' : 'not found')
       const params = r.pattern.exec(url.pathname)!.slice(1).map(decodeURIComponent)
       const result = await r.handler({ params, query: url.searchParams, body: () => readJson(req) })
-      send(res, 200, result)
+      if (result instanceof Raw) {
+        res.writeHead(200, { 'content-type': result.contentType })
+        res.end(result.body)
+      } else send(res, 200, result)
     } catch (e) {
       if (e instanceof HttpError) send(res, e.status, { error: e.message, details: e.details })
       else {
@@ -93,6 +108,16 @@ export function createApp(store: Store) {
         send(res, 500, { error: 'internal error' })
       }
     }
+  }
+}
+
+// A response that isn't JSON (e.g. the published XML).
+class Raw {
+  readonly contentType: string
+  readonly body: string
+  constructor(contentType: string, body: string) {
+    this.contentType = contentType
+    this.body = body
   }
 }
 

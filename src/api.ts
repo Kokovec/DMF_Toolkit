@@ -72,6 +72,13 @@ export const api = {
   deleteWorkload: (id: string) => call<unknown>('DELETE', `/workloads/${enc(id)}`),
   published: (id: string, revision: number) =>
     call<WorkloadDescription>('GET', `/workloads/${enc(id)}/published?revision=${revision}`),
+  // The published revision as XML text (errors arrive as JSON, like every other route).
+  publishedXml: async (id: string, revision: number) => {
+    const res = await fetch(`/api/workloads/${enc(id)}/published.xml?revision=${revision}`)
+    if (res.ok) return res.text()
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new ApiError(res.status, data.error ?? `HTTP ${res.status}`, data.details)
+  },
 }
 
 // Replace the UI catalog with the server's vendor module library (all versions).

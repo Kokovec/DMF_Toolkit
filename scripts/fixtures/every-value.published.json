@@ -1,0 +1,770 @@
+{
+  "apiVersion": "dmf-toolkit/v1alpha4",
+  "kind": "MediaWorkload",
+  "metadata": {
+    "id": "studio-a",
+    "name": "Studio A",
+    "description": "Studio A & \"B\"\n\tsecond line\r\nthird <line>",
+    "uid": "9dd110d0-8c14-5c77-acf6-3eb708bf0c13",
+    "revision": 3,
+    "libraryVersion": "4.0.1"
+  },
+  "spec": {
+    "defaults": {
+      "video": {
+        "grainRate": {
+          "num": 30000,
+          "den": 1001
+        },
+        "frameSize": {
+          "width": 1920,
+          "height": 1080
+        },
+        "colorspace": "BT709"
+      },
+      "audio": {
+        "sampleRate": {
+          "num": 48000,
+          "den": 1
+        },
+        "channelCount": 2
+      },
+      "mxl": {
+        "historyMs": 500
+      }
+    },
+    "domains": [
+      {
+        "id": "main"
+      }
+    ],
+    "functions": [
+      {
+        "id": "cam1",
+        "type": "dmf-mxl.1",
+        "typeVersion": "1.0.0",
+        "name": "Camera 1",
+        "domain": "main",
+        "parameters": {
+          "pattern": {
+            "pattern": {
+              "pattern": "smpte"
+            }
+          },
+          "mxl": {
+            "format": {
+              "video": {
+                "frameSize": "1920x1080",
+                "rate": "29.97",
+                "scan": "progressive",
+                "colorspace": "BT709",
+                "transfer": "SDR"
+              },
+              "audio": {
+                "channels": 2
+              }
+            }
+          }
+        },
+        "outputs": {
+          "mxl": 1
+        },
+        "control": {
+          "health": {
+            "type": "exec"
+          }
+        },
+        "resources": {
+          "cpu": 0.25,
+          "memoryMiB": 256
+        },
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "cam2",
+        "type": "dmf-mxl.1",
+        "typeVersion": "1.0.0",
+        "name": "Camera 2",
+        "domain": "main",
+        "parameters": {
+          "pattern": {
+            "pattern": {
+              "pattern": "ball"
+            }
+          },
+          "mxl": {
+            "format": {
+              "video": {
+                "frameSize": "1920x1080",
+                "rate": "29.97",
+                "scan": "progressive",
+                "colorspace": "BT709",
+                "transfer": "SDR"
+              },
+              "audio": {
+                "channels": 2
+              }
+            }
+          }
+        },
+        "outputs": {
+          "mxl": 1
+        },
+        "control": {
+          "health": {
+            "type": "exec"
+          }
+        },
+        "resources": {
+          "cpu": 0.25,
+          "memoryMiB": 256
+        },
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "sync",
+        "type": "dmf-mxl.2",
+        "typeVersion": "1.0.0",
+        "name": "Sync test",
+        "domain": "main",
+        "parameters": {
+          "mxl": {
+            "format": {
+              "video": {
+                "frameSize": "1920x1080",
+                "rate": "29.97",
+                "scan": "progressive",
+                "colorspace": "BT709",
+                "transfer": "SDR"
+              },
+              "audio": {
+                "channels": 2
+              }
+            }
+          }
+        },
+        "outputs": {
+          "mxl": 1
+        },
+        "control": {
+          "health": {
+            "type": "exec"
+          }
+        },
+        "resources": {
+          "cpu": 0.25,
+          "memoryMiB": 256
+        },
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "vision-mixer",
+        "type": "switchframe.1",
+        "typeVersion": "1.1.0",
+        "name": "Vision \"mixer\" & co's <1>\twith tab\nand newline",
+        "domain": "main",
+        "parameters": {
+          "mxl-src": {
+            "source": {
+              "delayMs": 0,
+              "label": "Cam \"one\" & <two>, it's",
+              "position": 1
+            },
+            "audio": {
+              "trimDb": 0,
+              "afv": true,
+              "delayMs": 0,
+              "highPass": {
+                "enabled": false
+              },
+              "gate": {
+                "enabled": false
+              },
+              "eq": {
+                "low": {
+                  "enabled": false
+                },
+                "mid": {
+                  "enabled": false
+                },
+                "high": {
+                  "enabled": false
+                }
+              },
+              "compressor": {
+                "thresholdDb": 0,
+                "ratio": 1,
+                "attackMs": 5,
+                "releaseMs": 100,
+                "makeupGainDb": 0
+              }
+            },
+            "key": {
+              "type": "off"
+            }
+          },
+          "mxl-src_2": {
+            "source": {
+              "delayMs": 0,
+              "label": "Camera 2",
+              "position": 2
+            },
+            "audio": {
+              "trimDb": 0,
+              "afv": true,
+              "delayMs": 0,
+              "highPass": {
+                "enabled": false
+              },
+              "gate": {
+                "enabled": false
+              },
+              "eq": {
+                "low": {
+                  "enabled": false
+                },
+                "mid": {
+                  "enabled": false
+                },
+                "high": {
+                  "enabled": false
+                }
+              },
+              "compressor": {
+                "thresholdDb": 0,
+                "ratio": 1,
+                "attackMs": 5,
+                "releaseMs": 100,
+                "makeupGainDb": 0
+              }
+            },
+            "key": {
+              "type": "off"
+            }
+          },
+          "mxl-src_3": {
+            "source": {
+              "delayMs": 0,
+              "label": "Sync test",
+              "position": 3
+            },
+            "audio": {
+              "trimDb": 0,
+              "afv": true,
+              "delayMs": 0,
+              "highPass": {
+                "enabled": false
+              },
+              "gate": {
+                "enabled": false
+              },
+              "eq": {
+                "low": {
+                  "enabled": false
+                },
+                "mid": {
+                  "enabled": false
+                },
+                "high": {
+                  "enabled": false
+                }
+              },
+              "compressor": {
+                "thresholdDb": 0,
+                "ratio": 1,
+                "attackMs": 5,
+                "releaseMs": 100,
+                "makeupGainDb": 0
+              }
+            },
+            "key": {
+              "type": "off"
+            }
+          },
+          "engine": {
+            "engine": {
+              "resolution": "1920x1080",
+              "rate": "29.97",
+              "scan": "progressive",
+              "colorProfile": "standard",
+              "colorspace": "BT709",
+              "frameSync": "off",
+              "frameRateConversion": "none",
+              "onAirAtStart": "mxl-src"
+            }
+          },
+          "audio": {
+            "master": {
+              "limiter": {
+                "thresholdDb": -3,
+                "ceilingDb": -1
+              }
+            }
+          },
+          "encoder": {
+            "encoder": {
+              "bitrateMbps": 0,
+              "gopSeconds": 2,
+              "preset": "balanced",
+              "timecode": false
+            }
+          },
+          "replay": {
+            "replay": {
+              "bufferSeconds": 300,
+              "shutterAngle": 180
+            }
+          },
+          "clips": {
+            "clips": {
+              "storageMaxGB": 10,
+              "ephemeralTtlHours": 24
+            }
+          },
+          "control": {
+            "control": {
+              "previewProxy": true,
+              "previewResolution": "480p",
+              "previewBitrateKbps": 500,
+              "relayResolution": "720p",
+              "relayBitrateKbps": 2000
+            },
+            "network": {
+              "exposure": "wan-facing",
+              "pathA": {}
+            }
+          },
+          "srt-out": {
+            "srt": {
+              "mode": "caller",
+              "latencyMs": 120,
+              "encryption": "aes-256",
+              "maxBandwidthMbps": 0,
+              "scte35": true,
+              "address": "cdn.example.net",
+              "port": 9000,
+              "passphrase": {
+                "$secret": "cdn-srt"
+              }
+            }
+          },
+          "rtmp-out": {
+            "rtmp": {
+              "url": "rtmps://live.example.com/app",
+              "streamKey": {
+                "$secret": "stream-key"
+              }
+            }
+          }
+        },
+        "inputs": {
+          "srt-src": 0,
+          "moq-src": 0,
+          "mxl-src": 3,
+          "st2110-src": 0
+        },
+        "outputs": {
+          "srt-out": 1,
+          "rtmp-out": 1,
+          "mxl-out": 1,
+          "st2110-out": 0
+        },
+        "control": {
+          "health": {
+            "type": "http",
+            "port": 9090,
+            "path": "/health"
+          },
+          "api": {
+            "type": "rest",
+            "port": 8081,
+            "path": "/api"
+          },
+          "nmos": {
+            "registers": "device"
+          }
+        },
+        "resources": {
+          "cpu": 2.5,
+          "memoryMiB": 4096,
+          "networkMbps": 200,
+          "storageGiB": 0.5,
+          "gpu": {
+            "class": "nvidia-l4",
+            "count": 1
+          }
+        },
+        "discovery": {
+          "register": true,
+          "labels": [
+            "news",
+            "studio a"
+          ]
+        },
+        "settings": {
+          "extraArgs": [
+            "--log-level",
+            "debug"
+          ],
+          "text": "& < > \" ' and tab\there, newline\nthere, CR\rhere, CRLF\r\nend, trailing space ",
+          "blank": "",
+          "spaces": "   ",
+          "unicode": "Ünïcødé ✓ 🎬 日本語",
+          "nil": null,
+          "yes": true,
+          "no": false,
+          "empty": {},
+          "emptyList": [],
+          "numbers": [
+            0,
+            1,
+            -1,
+            2.5,
+            -0.125,
+            1e-7,
+            1.2345e-12,
+            1e+21,
+            1152921504606847000,
+            123456789.123,
+            9007199254740991,
+            0
+          ],
+          "matrix": [
+            [
+              1,
+              2
+            ],
+            [],
+            [
+              {}
+            ],
+            [
+              [
+                null
+              ]
+            ]
+          ],
+          "records": [
+            {
+              "a": 1
+            },
+            {
+              "b": {
+                "c": null,
+                "d": []
+              }
+            }
+          ],
+          "nested": {
+            "deep": {
+              "with-dash": {
+                "under_score": "x"
+              }
+            }
+          },
+          "secretRef": {
+            "$secret": "vendor-token"
+          }
+        },
+        "dependencies": [
+          {
+            "name": "archive",
+            "kind": "storage",
+            "required": true,
+            "binding": "storage:archive-a"
+          },
+          {
+            "name": "upstream",
+            "kind": "function",
+            "required": false,
+            "role": "acquisition"
+          }
+        ],
+        "expectations": {
+          "resilience": "1+1",
+          "scaling": "fixed"
+        },
+        "placement": {
+          "site": "studio-a",
+          "cluster": "k3s",
+          "environment": "on-prem",
+          "with": [
+            "cam1",
+            "cam2"
+          ],
+          "apart": [
+            "sync"
+          ],
+          "licensing": "pool \"A\""
+        },
+        "features": {
+          "captions": false,
+          "captions.asr": false,
+          "scte35": false,
+          "scte35.scte104": false,
+          "replay": true,
+          "playout": false,
+          "ai-segment": false,
+          "recording": false
+        }
+      }
+    ],
+    "externals": [
+      {
+        "id": "cdn",
+        "kind": "destination",
+        "name": "CDN \"A\" & 'B'",
+        "notes": "line 1\nline 2 & <3>",
+        "reference": {
+          "kind": "srt",
+          "value": "cdn-ingest-a"
+        }
+      }
+    ],
+    "wires": [
+      {
+        "from": "cam1/mxl.video",
+        "to": "vision-mixer/mxl-src.video"
+      },
+      {
+        "from": "cam1/mxl.audio",
+        "to": "vision-mixer/mxl-src.audio"
+      },
+      {
+        "from": "cam2/mxl.video",
+        "to": "vision-mixer/mxl-src_2.video"
+      },
+      {
+        "from": "cam2/mxl.audio",
+        "to": "vision-mixer/mxl-src_2.audio"
+      },
+      {
+        "from": "sync/mxl.video",
+        "to": "vision-mixer/mxl-src_3.video"
+      },
+      {
+        "from": "sync/mxl.audio",
+        "to": "vision-mixer/mxl-src_3.audio"
+      }
+    ],
+    "access": {
+      "roles": {
+        "director": [
+          "director1",
+          "deputy.2"
+        ],
+        "audio": [
+          "audio1"
+        ],
+        "graphics": [
+          "gfx_1"
+        ],
+        "captioner": [
+          "cc-1"
+        ],
+        "viewer": [
+          "viewer1"
+        ]
+      }
+    },
+    "flows": [
+      {
+        "id": "817de3a0-f16a-5268-9d73-6b157c4b3611",
+        "label": "cam1/mxl.video",
+        "domain": "main",
+        "essence": "video",
+        "writer": "cam1/mxl.video",
+        "readers": [
+          "vision-mixer/mxl-src.video"
+        ],
+        "format": {
+          "mediaType": "video/v210",
+          "grainRate": {
+            "num": 30000,
+            "den": 1001
+          },
+          "frameWidth": 1920,
+          "frameHeight": 1080,
+          "interlace": "progressive",
+          "colorspace": "BT709",
+          "transfer": "SDR"
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "0df91bf2-acf0-536c-9baa-33391e24529a",
+        "label": "cam1/mxl.audio",
+        "domain": "main",
+        "essence": "audio",
+        "writer": "cam1/mxl.audio",
+        "readers": [
+          "vision-mixer/mxl-src.audio"
+        ],
+        "format": {
+          "mediaType": "audio/float32",
+          "sampleRate": {
+            "num": 48000,
+            "den": 1
+          },
+          "channelCount": 2
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "2d0d6a28-4be2-5019-815b-e137d99e7cb9",
+        "label": "cam2/mxl.video",
+        "domain": "main",
+        "essence": "video",
+        "writer": "cam2/mxl.video",
+        "readers": [
+          "vision-mixer/mxl-src_2.video"
+        ],
+        "format": {
+          "mediaType": "video/v210",
+          "grainRate": {
+            "num": 30000,
+            "den": 1001
+          },
+          "frameWidth": 1920,
+          "frameHeight": 1080,
+          "interlace": "progressive",
+          "colorspace": "BT709",
+          "transfer": "SDR"
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "4657deb1-15c6-50b3-a3f6-d362c5df1d51",
+        "label": "cam2/mxl.audio",
+        "domain": "main",
+        "essence": "audio",
+        "writer": "cam2/mxl.audio",
+        "readers": [
+          "vision-mixer/mxl-src_2.audio"
+        ],
+        "format": {
+          "mediaType": "audio/float32",
+          "sampleRate": {
+            "num": 48000,
+            "den": 1
+          },
+          "channelCount": 2
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "f0f87544-fcf8-5cc1-9852-f601025609bc",
+        "label": "sync/mxl.video",
+        "domain": "main",
+        "essence": "video",
+        "writer": "sync/mxl.video",
+        "readers": [
+          "vision-mixer/mxl-src_3.video"
+        ],
+        "format": {
+          "mediaType": "video/v210",
+          "grainRate": {
+            "num": 30000,
+            "den": 1001
+          },
+          "frameWidth": 1920,
+          "frameHeight": 1080,
+          "interlace": "progressive",
+          "colorspace": "BT709",
+          "transfer": "SDR"
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "778c3ad8-a7ad-526c-be61-9b18ed1c5461",
+        "label": "sync/mxl.audio",
+        "domain": "main",
+        "essence": "audio",
+        "writer": "sync/mxl.audio",
+        "readers": [
+          "vision-mixer/mxl-src_3.audio"
+        ],
+        "format": {
+          "mediaType": "audio/float32",
+          "sampleRate": {
+            "num": 48000,
+            "den": 1
+          },
+          "channelCount": 2
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      },
+      {
+        "id": "7bc1d998-ac05-5b73-bed3-f61352d6515e",
+        "label": "vision-mixer/mxl-out.video",
+        "domain": "main",
+        "essence": "video",
+        "writer": "vision-mixer/mxl-out.video",
+        "readers": [],
+        "format": {
+          "mediaType": "video/v210",
+          "grainRate": {
+            "num": 30000,
+            "den": 1001
+          },
+          "frameWidth": 1920,
+          "frameHeight": 1080,
+          "interlace": "progressive",
+          "colorspace": "BT709"
+        },
+        "historyMs": 1000,
+        "discovery": {
+          "register": true,
+          "labels": [
+            "programme",
+            "clean"
+          ]
+        }
+      },
+      {
+        "id": "8c7f32aa-4a6d-579c-b797-44644d02e862",
+        "label": "vision-mixer/mxl-out.audio",
+        "domain": "main",
+        "essence": "audio",
+        "writer": "vision-mixer/mxl-out.audio",
+        "readers": [],
+        "format": {
+          "mediaType": "audio/float32",
+          "sampleRate": {
+            "num": 48000,
+            "den": 1
+          },
+          "channelCount": 2
+        },
+        "historyMs": 500,
+        "discovery": {
+          "register": true
+        }
+      }
+    ]
+  }
+}

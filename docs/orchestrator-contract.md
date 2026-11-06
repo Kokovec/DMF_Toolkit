@@ -49,6 +49,36 @@ These are **requirements and constraints, not decisions**: e.g. `placement.site`
 preference, `resources` is what the function needs, and `expectations.resilience: "1+1"` says
 what the operator wants. The orchestrator chooses hosts, replicas, licences and resources.
 
+## As XML (what the orchestrator reads)
+
+`GET /api/workloads/:id/published.xml[?revision=N]` returns the same document as XML
+(`application/xml; charset=utf-8`), namespace `urn:dmf:workload:v1`, schema
+[`../schemas/dmf-workload-v1.xsd`](../schemas/dmf-workload-v1.xsd). *Publish XML* in the app downloads
+it. The definition is `switchframe-dmf/docs/orchestration/01-contract.md`; the XSD there is the source
+of truth and the copy here is byte-identical (a test checks its hash). In short:
+
+- **Mapping:** metadata as attributes of `<workload>` (plus `schemaVersion="1"`); `defaults` with each
+  rational as `…Num`/`…Den`; `access` as `<role name><member>`; per function `<inputs>`/`<outputs>`
+  (`<use block copies>`, zeros included), `<features>`, `<parameters>`, `<settings>`, then `control`,
+  `dependencies`, `resources`, `expectations`, `placement`, `discovery`; `flows` with `<reader>`,
+  `<format>`, `<discovery>`; `wires`. Canvas layout isn't carried, and `flowOptions` aren't published
+  at all (JSON or XML): they're already resolved into `flows`.
+- **Values:** every leaf of `parameters` and `settings` is `<value path="a.b[0].c" type>` with type
+  `string`, `integer`, `number` (no exponent), `boolean`, `secret` (the name only), `null`,
+  `emptyObject` or `emptyArray`. A missing value means "not set".
+- **Bytes:** UTF-8, declaration, 2-space indent, LF, trailing newline, no DOCTYPE or comments; element
+  order from the XSD, document order otherwise. `& < > " '` are escaped everywhere; so are CR (in
+  text and attributes) and tab and LF in attributes, as character references, so readers get them back.
+- **Refused (every location named):** characters XML 1.0 can't carry, keys outside `[A-Za-z0-9_-]`
+  (so a `$secret` object with any other key), and values the XSD refuses: ids, port refs, block ids,
+  UUIDs, whole numbers, and tokens not in normal form (an `xs:token` is read collapsed). These are
+  publish problems, so both routes give the same 422 and the canvas shows them before publishing.
+- **Ids:** workload, function and external device ids match `^[a-z0-9]([-a-z0-9]{0,40}[a-z0-9])?$`,
+  checked when saving (a save with another id is refused with 400).
+- **History:** `historyMs` is at least 1, as the workload default and as each flow's option.
+- **Fixtures:** `scripts/fixtures/studio-a` and `every-value` (`.workload.xml` + `.published.json`, from
+  `npx tsx scripts/fixtures/write-xml.ts`) are the round-trip fixtures both repos test.
+
 ## What the orchestrator configures
 
 - Creates and manages the lifecycle of **MXL domains and flows**, using the flow ids and formats
@@ -124,3 +154,5 @@ what the operator wants. The orchestrator chooses hosts, replicas, licences and 
   says who may operate the workload; unread MXL outputs publish their video and audio flows with
   empty `readers`; a field with `x-options` (e.g. `engine.engine.onAirAtStart`) is always published
   with an explicit value.
+- **XML handover** (2026-11-05): the published revision is also served as XML
+  (`/published.xml`), the format the orchestrator reads; the JSON route stays.

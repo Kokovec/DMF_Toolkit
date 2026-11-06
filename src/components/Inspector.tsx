@@ -3,8 +3,8 @@ import { useCatalog } from '../api'
 import { EXTERNALS, REFERENCE_KINDS } from '../model/externals'
 import { getCategory, LIBRARY } from '../model/library'
 import { leafPaths } from '../model/schema'
-import type { Colorspace, ExternalRefKind, ExternalReference, FlowDef, FlowOptions, VendorModule, WorkloadAccess, WorkloadDefaults } from '../model/types'
-import { DEFAULT_HISTORY_MS, moduleOf, rebind, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
+import { INSTANCE_ID_MAX, type Colorspace, type ExternalRefKind, type ExternalReference, type FlowDef, type FlowOptions, type VendorModule, type WorkloadAccess, type WorkloadDefaults } from '../model/types'
+import { DEFAULT_HISTORY_MS, moduleOf, rebind, toInstanceId, type CanvasNode, type ExtData, type FnData, type WorkloadMeta } from '../model/workload'
 
 type Props = {
   selected: CanvasNode[]
@@ -59,7 +59,8 @@ function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefau
       {selected.length > 1 && <p className="hint">{selected.length} blocks selected.</p>}
       <label className="field">
         <span>ID</span>
-        <input value={metadata.id} onChange={(e) => onMetadataChange({ ...metadata, id: e.target.value })} />
+        <input value={metadata.id} maxLength={INSTANCE_ID_MAX} onChange={(e) => onMetadataChange({ ...metadata, id: toInstanceId(e.target.value) })} />
+        <span className="hint">Lowercase letters, digits and -; at most {INSTANCE_ID_MAX} characters.</span>
       </label>
       <label className="field">
         <span>Name</span>
@@ -149,9 +150,9 @@ function WorkloadPanel({ selected, metadata, onMetadataChange, defaults, onDefau
         <span>MXL flow history (ms)</span>
         <input
           type="number"
-          min={0}
+          min={1}
           value={defaults.mxl?.historyMs ?? DEFAULT_HISTORY_MS}
-          onChange={(e) => onDefaultsChange({ ...defaults, mxl: { historyMs: Math.max(0, e.target.valueAsNumber || 0) } })}
+          onChange={(e) => onDefaultsChange({ ...defaults, mxl: { historyMs: Math.max(1, Math.round(e.target.valueAsNumber) || 1) } })}
         />
         <span className="hint">How much of each flow readers need buffered; per-flow overrides on the wire.</span>
       </label>
@@ -432,10 +433,10 @@ function FlowPanel({ flows, nodes, onNodeChange }: Props) {
               <span>History (ms)</span>
               <input
                 type="number"
-                min={0}
+                min={1}
                 value={opts.historyMs ?? ''}
                 placeholder={`${f.historyMs} (workload default)`}
-                onChange={(e) => setOpts({ historyMs: Number.isNaN(e.target.valueAsNumber) ? undefined : e.target.valueAsNumber })}
+                onChange={(e) => setOpts({ historyMs: Number.isNaN(e.target.valueAsNumber) ? undefined : Math.max(1, Math.round(e.target.valueAsNumber)) })}
               />
             </label>
             <label className="field field-check">

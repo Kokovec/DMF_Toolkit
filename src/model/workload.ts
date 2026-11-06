@@ -20,8 +20,11 @@ import {
 import { LIBRARY } from './library'
 import { defaultsFor, getPath, leafPaths, optionPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
+import { toWorkloadXml, XmlEncodeError } from './xml'
 import {
   API_VERSION,
+  INSTANCE_ID_MAX,
+  INSTANCE_ID_RE,
   DEPENDENCY_KINDS,
   type ControlSpec,
   type Dependency,
@@ -127,12 +130,25 @@ export function splitRef(r: string): { node: string; port: string } {
 }
 
 // Readable, stable ids ("vision-mixer-2") so the graph reads like source code.
+// A new, unused instance id "<base>-<n>". The base is reduced to what an id allows (lowercase letters,
+// digits, -) and shortened so the id stays within INSTANCE_ID_MAX.
 export function nextNodeId(base: string, existing: Iterable<string>): string {
   const ids = new Set(existing)
+  const clean = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'fn'
   let n = 1
-  while (ids.has(`${base}-${n}`)) n++
-  return `${base}-${n}`
+  const id = () => `${clean.slice(0, INSTANCE_ID_MAX - String(n).length - 1).replace(/-+$/, '')}-${n}`
+  while (ids.has(id())) n++
+  return id()
 }
+
+// What the user types as a workload id, reduced to the characters an id allows. The result can still
+// be invalid while typing (e.g. a trailing -); checkWorkload says so.
+export function toInstanceId(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, INSTANCE_ID_MAX)
+}
+
+const idProblem = (what: string, id: string) =>
+  INSTANCE_ID_RE.test(id) ? [] : [`${what} id "${id}" must be lowercase letters, digits and -, not starting or ending with -, at most ${INSTANCE_ID_MAX} characters`]
 
 // `over` on top of `base`, object by object.
 function merged(base: { [k: string]: JsonValue }, over: { [k: string]: JsonValue }): { [k: string]: JsonValue } {
@@ -423,7 +439,9 @@ export function checkWorkload(doc: unknown, cat: Catalog = currentCatalog()): st
     const v = (doc as WorkloadDescription)?.apiVersion
     return [v && v !== API_VERSION ? `unsupported apiVersion: ${v} (expected ${API_VERSION})` : 'not a MediaWorkload document']
   }
-  const errors: string[] = []
+  const errors: string[] = [...idProblem('workload', doc.metadata.id)]
+  for (const f of doc.spec.functions) errors.push(...idProblem('function', f.id))
+  for (const x of doc.spec.externals) errors.push(...idProblem('external device', x.id))
   const nodes = new Map<string, CanvasNode>()
   const add = (n: CanvasNode) => {
     if (nodes.has(n.id)) errors.push(`duplicate id: ${n.id}`)
@@ -494,7 +512,30 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
       if (!doc.spec.functions.some((g) => g.id === other)) errors.push(`${f.id}: placement refers to unknown function ${other}`)
   }
   errors.push(...accessProblems(doc.spec.access))
+  errors.push(...historyProblems(doc))
+  // What the XML can't carry (characters XML 1.0 lacks, unencodable keys, tokens not in normal form),
+  // with the serialiser's own location text, so the JSON route, the XML route and the canvas agree.
+  // Checked once everything else holds: the published form needs a valid document.
+  if (!errors.length) {
+    try {
+      toWorkloadXml(toPublished(doc, doc.metadata.revision ?? 1, cat))
+    } catch (e) {
+      if (!(e instanceof XmlEncodeError)) throw e
+      errors.push(...e.problems)
+    }
+  }
   return errors
+}
+
+// MXL history depth is at least 1 ms, the workload default and every flow option.
+function historyProblems(doc: WorkloadDescription): string[] {
+  const bad = (v: unknown) => v !== undefined && !(typeof v === 'number' && Number.isInteger(v) && v >= 1)
+  return [
+    ...(bad(doc.spec.defaults.mxl?.historyMs) ? [`spec.defaults.mxl.historyMs: must be a whole number ≥ 1`] : []),
+    ...doc.spec.functions.flatMap((f) =>
+      Object.entries(f.flowOptions ?? {}).flatMap(([port, o]) => (bad(o.historyMs) ? [`${f.id}: flow ${port}: historyMs must be a whole number ≥ 1`] : [])),
+    ),
+  ]
 }
 
 // An instance's own setup: vendor settings, control & health, dependencies, resources.
@@ -680,7 +721,8 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
 // with the MXL flow definitions and each function's resource profile and discovery settings.
 export function toPublished(doc: WorkloadDescription, revision: number, cat: Catalog = currentCatalog()): WorkloadDescription {
   const { layout: _layout, ...rest } = doc
-  const functions = doc.spec.functions.map((f) => {
+  // flowOptions are resolved into `flows`, so they aren't published (and the XML doesn't carry them)
+  const functions = doc.spec.functions.map(({ flowOptions: _flowOptions, ...f }) => {
     const prim = cat.get(f.type, f.typeVersion)
     return {
       ...f,

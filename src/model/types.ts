@@ -4,7 +4,11 @@
 export const API_VERSION = 'dmf-toolkit/v1alpha4'
 
 // Ids of primitives, modules, ports, catalogs: lowercase letters, digits, . _ -
-export const ID_RE = /^[a-z0-9][a-z0-9._-]*$/
+export const ID_RE = /^[a-z0-9][a-z0-9._-]*$/ // catalogs and modules (e.g. switchframe.1)
+// Workloads, function instances and external devices: the XML schema's `Id`, which also fits a
+// Kubernetes name as `wl-<id>`. At most 42 characters.
+export const INSTANCE_ID_RE = /^[a-z0-9]([-a-z0-9]{0,40}[a-z0-9])?$/
+export const INSTANCE_ID_MAX = 42
 
 export type Essence = 'video' | 'audio' | 'data'
 export const ESSENCES: Essence[] = ['video', 'audio', 'data']

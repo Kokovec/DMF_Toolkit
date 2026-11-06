@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMF workload desired state, version 1. Published by DMF Toolkit, consumed by the compiler in
+  switchframe-dmf. Contract and semantics: docs/orchestration/01-contract.md.
+
+  This file is the source of truth. DMF_Toolkit/schemas/dmf-workload-v1.xsd is a byte-identical copy.
+  Any change that could make an existing document invalid or change its meaning needs a new namespace
+  and file (v2). XSD 1.0 only.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:w="urn:dmf:workload:v1"
+           targetNamespace="urn:dmf:workload:v1"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified">
+
+  <xs:simpleType name="Id">
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[a-z0-9]([-a-z0-9]{0,40}[a-z0-9])?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Uuid">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- "<function or external id>/<port key>", e.g. cam1/mxl.video, vision-mixer/mxl-src_2.audio -->
+  <xs:simpleType name="PortRef">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[a-z0-9-]+/[A-Za-z0-9_.\[\]-]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Block id, or an add-on as "<block>.<add-on key>", e.g. recording, captions.asr -->
+  <xs:simpleType name="BlockId">
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[a-z0-9-]+(\.[a-z0-9-]+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ValueType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="integer"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="boolean"/>
+      <xs:enumeration value="secret"/>
+      <xs:enumeration value="null"/>
+      <xs:enumeration value="emptyObject"/>
+      <xs:enumeration value="emptyArray"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- One leaf of a JSON tree: a.b[0].c -->
+  <xs:complexType name="Value">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="path" use="required">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:pattern value="[A-Za-z0-9_-]+(\[[0-9]+\])*(\.[A-Za-z0-9_-]+(\[[0-9]+\])*)*"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:attribute>
+        <xs:attribute name="type" type="w:ValueType" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="ValueTree">
+    <xs:sequence>
+      <xs:element name="value" type="w:Value" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Selection">
+    <xs:sequence>
+      <xs:element name="use" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="block" type="w:BlockId" use="required"/>
+          <xs:attribute name="copies" type="xs:nonNegativeInteger" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Discovery">
+    <xs:sequence>
+      <xs:element name="label" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="register" type="xs:boolean" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="Function">
+    <xs:sequence>
+      <xs:element name="inputs" type="w:Selection" minOccurs="0"/>
+      <xs:element name="outputs" type="w:Selection" minOccurs="0"/>
+      <xs:element name="features" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="feature" minOccurs="0" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="block" type="w:BlockId" use="required"/>
+                <xs:attribute name="enabled" type="xs:boolean" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="parameters" type="w:ValueTree"/>
+      <xs:element name="settings" type="w:ValueTree" minOccurs="0"/>
+      <xs:element name="control" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="health" minOccurs="0">
+              <xs:complexType>
+                <xs:attribute name="type" use="required">
+                  <xs:simpleType>
+                    <xs:restriction base="xs:token">
+                      <xs:enumeration value="http"/>
+                      <xs:enumeration value="tcp"/>
+                      <xs:enumeration value="grpc"/>
+                      <xs:enumeration value="exec"/>
+                    </xs:restriction>
+                  </xs:simpleType>
+                </xs:attribute>
+                <xs:attribute name="port" type="xs:positiveInteger"/>
+                <xs:attribute name="path" type="xs:string"/>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="api" minOccurs="0">
+              <xs:complexType>
+                <xs:attribute name="type" type="xs:token" use="required"/>
+                <xs:attribute name="port" type="xs:positiveInteger" use="required"/>
+                <xs:attribute name="path" type="xs:string"/>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="nmos" minOccurs="0">
+              <xs:complexType>
+                <xs:attribute name="registers" type="xs:token" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" minOccurs="0" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <xs:attribute name="kind" type="xs:token" use="required"/>
+                <xs:attribute name="required" type="xs:boolean" use="required"/>
+                <xs:attribute name="role" type="xs:string"/>
+                <xs:attribute name="binding" type="xs:string"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="resources" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="gpu" minOccurs="0">
+              <xs:complexType>
+                <xs:attribute name="class" type="xs:string" use="required"/>
+                <xs:attribute name="count" type="xs:nonNegativeInteger" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+          <xs:attribute name="cpu" type="xs:decimal"/>
+          <xs:attribute name="memoryMiB" type="xs:decimal"/>
+          <xs:attribute name="networkMbps" type="xs:decimal"/>
+          <xs:attribute name="storageGiB" type="xs:decimal"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="expectations" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="resilience" type="xs:token"/>
+          <xs:attribute name="scaling" type="xs:token"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="placement" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="with" type="w:Id" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="apart" type="w:Id" minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+          <xs:attribute name="site" type="xs:string"/>
+          <xs:attribute name="cluster" type="xs:string"/>
+          <xs:attribute name="environment" type="xs:token"/>
+          <xs:attribute name="licensing" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="discovery" type="w:Discovery" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="w:Id" use="required"/>
+    <xs:attribute name="type" type="xs:token" use="required"/>
+    <xs:attribute name="typeVersion" type="xs:token" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="domain" type="xs:token" use="required"/>
+  </xs:complexType>
+
+  <xs:element name="workload">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="description" type="xs:string" minOccurs="0"/>
+        <xs:element name="defaults">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="video">
+                <xs:complexType>
+                  <xs:attribute name="grainRateNum" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="grainRateDen" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="frameWidth" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="frameHeight" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="colorspace" type="xs:token" use="required"/>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="audio">
+                <xs:complexType>
+                  <xs:attribute name="sampleRateNum" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="sampleRateDen" type="xs:positiveInteger" use="required"/>
+                  <xs:attribute name="channelCount" type="xs:positiveInteger" use="required"/>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="mxl" minOccurs="0">
+                <xs:complexType>
+                  <xs:attribute name="historyMs" type="xs:positiveInteger" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="access" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="role" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="member" type="xs:token" minOccurs="0" maxOccurs="unbounded"/>
+                  </xs:sequence>
+                  <xs:attribute name="name" type="xs:token" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="domains">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="domain" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id" type="xs:token" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="functions">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="function" type="w:Function" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="externals" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="external" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="notes" type="xs:string" minOccurs="0"/>
+                    <xs:element name="reference" minOccurs="0">
+                      <xs:complexType>
+                        <xs:attribute name="kind" type="xs:token" use="required"/>
+                        <xs:attribute name="value" type="xs:string" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="id" type="w:Id" use="required"/>
+                  <xs:attribute name="kind" type="xs:token" use="required"/>
+                  <xs:attribute name="name" type="xs:string" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="flows" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="flow" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="reader" type="w:PortRef" minOccurs="0" maxOccurs="unbounded"/>
+                    <xs:element name="format">
+                      <xs:complexType>
+                        <xs:attribute name="mediaType" type="xs:token" use="required"/>
+                        <xs:attribute name="grainRateNum" type="xs:positiveInteger"/>
+                        <xs:attribute name="grainRateDen" type="xs:positiveInteger"/>
+                        <xs:attribute name="frameWidth" type="xs:positiveInteger"/>
+                        <xs:attribute name="frameHeight" type="xs:positiveInteger"/>
+                        <xs:attribute name="interlace" type="xs:token"/>
+                        <xs:attribute name="colorspace" type="xs:token"/>
+                        <xs:attribute name="transfer" type="xs:token"/>
+                        <xs:attribute name="sampleRateNum" type="xs:positiveInteger"/>
+                        <xs:attribute name="sampleRateDen" type="xs:positiveInteger"/>
+                        <xs:attribute name="channelCount" type="xs:positiveInteger"/>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="discovery" type="w:Discovery"/>
+                  </xs:sequence>
+                  <xs:attribute name="id" type="w:Uuid" use="required"/>
+                  <xs:attribute name="label" type="xs:string" use="required"/>
+                  <xs:attribute name="domain" type="xs:token" use="required"/>
+                  <xs:attribute name="essence" use="required">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:token">
+                        <xs:enumeration value="video"/>
+                        <xs:enumeration value="audio"/>
+                        <xs:enumeration value="data"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:attribute>
+                  <xs:attribute name="writer" type="w:PortRef" use="required"/>
+                  <xs:attribute name="historyMs" type="xs:positiveInteger" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="wires" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="wire" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="from" type="w:PortRef" use="required"/>
+                  <xs:attribute name="to" type="w:PortRef" use="required"/>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="schemaVersion" type="xs:positiveInteger" fixed="1" use="required"/>
+      <xs:attribute name="apiVersion" type="xs:token" use="required"/>
+      <xs:attribute name="id" type="w:Id" use="required"/>
+      <xs:attribute name="uid" type="w:Uuid" use="required"/>
+      <xs:attribute name="name" type="xs:string" use="required"/>
+      <xs:attribute name="revision" type="xs:positiveInteger" use="required"/>
+      <xs:attribute name="libraryVersion" type="xs:token" use="required"/>
+    </xs:complexType>
+    <xs:unique name="uniqueFunctionId">
+      <xs:selector xpath="w:functions/w:function"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="uniqueFlowId">
+      <xs:selector xpath="w:flows/w:flow"/>
+      <xs:field xpath="@id"/>
+    </xs:unique>
+    <xs:unique name="uniqueFlowWriter">
+      <xs:selector xpath="w:flows/w:flow"/>
+      <xs:field xpath="@writer"/>
+    </xs:unique>
+  </xs:element>
+</xs:schema>

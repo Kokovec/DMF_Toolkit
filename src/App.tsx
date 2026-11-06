@@ -73,8 +73,8 @@ function loadDraft() {
 
 const initial = loadDraft()
 
-function download(name: string, data: unknown) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+function download(name: string, data: unknown, type = 'application/json') {
+  const url = URL.createObjectURL(new Blob([typeof data === 'string' ? data : JSON.stringify(data, null, 2)], { type }))
   const a = document.createElement('a')
   a.href = url
   a.download = name
@@ -294,6 +294,19 @@ function Editor() {
     }
   }
 
+  // The same, as the XML the orchestrator reads (`make import XML=…`).
+  const publishXml = async () => {
+    const revision = dirty || !savedHere ? await save() : savedHere.revision
+    if (revision === null) return
+    try {
+      const xml = await api.publishedXml(metadata.id, revision)
+      download(`${metadata.id}.workload.xml`, xml, 'application/xml')
+      showMessage(`Published revision ${revision} as XML. Orchestrator endpoint: /api/workloads/${metadata.id}/published.xml`, false)
+    } catch (e) {
+      showMessage(`Publish XML failed: ${describeError(e)}`, true)
+    }
+  }
+
   const open = async (id: string) => {
     if (dirty && nodes.length && !confirm('Discard unsaved changes on the canvas?')) return
     try {
@@ -354,6 +367,13 @@ function Editor() {
           title={problems.length ? `${problems.length} issue(s): see Publish readiness (click empty canvas)` : 'Save and publish to the orchestrator'}
         >
           Publish{problems.length ? ` (${problems.length})` : ''}
+        </button>
+        <button
+          onClick={publishXml}
+          disabled={!online || problems.length > 0}
+          title={problems.length ? `${problems.length} issue(s): see Publish readiness (click empty canvas)` : 'Save, publish and download the XML the orchestrator reads'}
+        >
+          Publish XML
         </button>
         <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={importJson} />
       </header>

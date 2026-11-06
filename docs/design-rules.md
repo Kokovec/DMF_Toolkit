@@ -154,7 +154,9 @@ primitives still existed; the parameters now live on features). `media-primitive
   they affect (session, network constraints, payload), via `x-group` and `x-title-when`. Without
   a second path there is a single box (Connection / Network / Stream).
 - **R5.5 Secrets are references** (`{"$secret": "name"}`), never values.
-- **R5.6 Buffers are budgets, not sizes:** `maxLatencyMs`, flow `historyMs`.
+- **R5.6 Buffers are budgets, not sizes:** `maxLatencyMs`, flow `historyMs`. MXL history is at least
+  1 ms (whole milliseconds), as the workload default and as each flow's option.
+  *Enforced by:* `historyProblems` (`workload.ts`), the Workload panel and Flow panel inputs.
 - **R5.7 Required values without a default** (e.g. a port) are for the designer to fill in.
   Publishing is blocked until they're set.
 - **R5.8 A parameter group can list the valid combinations of two fields** (`x-allowed`), so a choice
@@ -261,6 +263,28 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R8.1 Every save is a new revision;** saves based on a stale revision are rejected.
 - **R8.2 Publishing = a saved revision that passes every check,** served at
   `GET /api/workloads/:id/published`. *Enforced by:* `publishProblems`, `server/app.ts`.
+- **R8.6 The orchestrator reads the published revision as XML** (`GET
+  /api/workloads/:id/published.xml[?revision=N]`, `application/xml; charset=utf-8`; *Publish XML* in
+  the app downloads `<workload id>.workload.xml`). It's a lossless rendering of the JSON route, under
+  `switchframe-dmf/docs/orchestration/01-contract.md` and its XSD (the source of truth; this repo
+  keeps a byte-identical copy in `schemas/`, checked against a recorded hash). The same revision
+  always gives the same bytes. It has the JSON route's checks and 422s; anything XML or the XSD
+  can't carry is also 422, naming each location: characters XML 1.0 lacks, keys outside
+  `[A-Za-z0-9_-]`, ids, counts and tokens the XSD refuses. These are **publish problems** too, with
+  the serialiser's own location text (`publishProblems` asks `toWorkloadXml`), so the JSON route, the
+  XML route and the canvas agree. Secrets carry only their name. Flow options aren't published:
+  they're resolved into `flows`, so the JSON and the XML carry the same document. Both repos test the
+  round trip on the fixtures in `scripts/fixtures/` (`*.workload.xml` + `*.published.json`).
+  *Enforced by:* `toWorkloadXml` (`src/model/xml.ts`), `publishProblems`, `toPublished`
+  (`workload.ts`), `server/app.ts`, `tests/*.test.ts`.
+- **R8.7 Workload, function and external device ids match the schema's `Id`:**
+  `^[a-z0-9]([-a-z0-9]{0,40}[a-z0-9])?$` (lowercase letters, digits and `-`, not starting or ending
+  with `-`, at most 42), which also fits a Kubernetes name as `wl-<id>`. Checked when saving, not only
+  when publishing. New function and device ids are always valid; the workload id field keeps only
+  allowed characters. Catalog and module ids keep their own rule (R3.3, R3.4). A document with an id
+  that doesn't match still opens, but can't be saved, imported or published until it's renamed; the
+  problem names the id. *Enforced by:* `checkWorkload`, `nextNodeId`, `toInstanceId` (`workload.ts`),
+  `PUT /api/workloads/:id` (`server/app.ts`), Workload panel (`Inspector.tsx`).
 - **R8.3 The workload description is the workflow intent** published to the orchestrator.
 - **R8.5 A workload says who may operate it** (`spec.access.roles`: usernames per role; Inspector →
   Workload → Access). Roles come from the library's vocabulary: director, audio, graphics, captioner,
@@ -346,6 +370,8 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-02 | Blocks with no data flow (`noData`) on the test sources and Switchframe's `mxl-out`, so a bundle drag can't create a data wire the product can't serve; descriptions promising MXL VANC corrected | R6.1, R7.7, R7.8 |
 | 2026-11-02 | `defaults.discovery` and `defaults.parameters` for a new instance; `dmf-mxl.1` starts at 1080p29.97. Captions mode loses `off`. Reference workload `scripts/fixtures/studio-a.ts`. Library stays 4.0.0 and modules 1.1.0 / 1.0.0: none was committed or recorded by a real server, and no saved workload uses them | R4.1, R7.7, R7.8, R3.5, R3.7 |
 | 2026-11-02 | SCTE-104 only reads: it requires an MXL source, since writing to the programme fails without a data writer. Library 4.0.1: a real server had recorded 4.0.0, so R3.7 requires the bump. Modules stay 1.1.0 / 1.0.0: their stored parts don't change | R3.14, R7.7, R3.7 |
+| 2026-11-05 | XML publish (stage 2 of the orchestration build, `03-toolkit-spec.md` §9): `published.xml` route, *Publish XML*, `src/model/xml.ts`, schema copy, shared fixtures and `npm test` | R8.6 |
+| 2026-11-05 | Stage 2 review: XML encodability is a publish problem (the JSON route, XML route and canvas agree); workload, function and external ids follow the schema's `Id`, checked on save; MXL history ≥ 1 ms; `toPublished` drops `flowOptions` | R8.6, R8.7, R5.6 |
 
 ## Open questions
 

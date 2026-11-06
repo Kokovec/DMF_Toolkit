@@ -2,7 +2,7 @@
   "apiVersion": "dmf-toolkit/v1alpha4",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "4.0.1",
+    "version": "4.0.2",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -1565,12 +1565,13 @@
               "address": {
                 "type": "string",
                 "title": "Source address",
-                "description": "host:port of the source to pull from.",
+                "description": "host:port of the source to pull from, e.g. venue.example.net:9000.",
                 "x-when": {
                   "mode": [
                     "caller"
                   ]
-                }
+                },
+                "pattern": "^[A-Za-z0-9.-]+:[0-9]{1,5}$"
               },
               "streamId": {
                 "type": "string",
@@ -2410,8 +2411,8 @@
               "rotateAfterMinutes": {
                 "type": "integer",
                 "title": "New file every (min)",
-                "description": "0 = never rotate on time.",
-                "minimum": 0,
+                "description": "How often to start a new file.",
+                "minimum": 1,
                 "maximum": 1440,
                 "default": 60
               },
@@ -2817,11 +2818,10 @@
                 "title": "When no rule matches",
                 "enum": [
                   "pass",
-                  "drop",
-                  "rewrite"
+                  "drop"
                 ],
                 "default": "pass",
-                "description": "Signal conditioning default action."
+                "description": "Signal conditioning default action. Rewrite is a per-rule action, not a default."
               }
             }
           }

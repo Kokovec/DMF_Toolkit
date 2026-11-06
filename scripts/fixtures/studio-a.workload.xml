@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<workload xmlns="urn:dmf:workload:v1" schemaVersion="1" apiVersion="dmf-toolkit/v1alpha4" id="studio-a" uid="9dd110d0-8c14-5c77-acf6-3eb708bf0c13" name="Studio A" revision="1" libraryVersion="4.0.1">
+<workload xmlns="urn:dmf:workload:v1" schemaVersion="1" apiVersion="dmf-toolkit/v1alpha4" id="studio-a" uid="9dd110d0-8c14-5c77-acf6-3eb708bf0c13" name="Studio A" revision="1" libraryVersion="4.0.2">
   <description>Two-camera studio with an A/V sync source: the news-studio design, expressed as a published workload.</description>
   <defaults>
     <video grainRateNum="30000" grainRateDen="1001" frameWidth="1920" frameHeight="1080" colorspace="BT709"/>

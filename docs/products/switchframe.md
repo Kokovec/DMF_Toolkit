@@ -74,7 +74,7 @@ are resolved by the orchestrator.
 | `mxl-src` copies (wires) | `--mxl-sources video:audio[:data]` | Flow IDs from the wires. The optional `anc` port is the data flow, which the product reads |
 | `mxl-out` copies (0 or 1) | `--mxl-output`, `--mxl-output-video-def`, `--mxl-output-audio-def` | From the published `flows`; its video and audio flows are published even when unread. No data flow (`noData`): `StartLifecycle` gets no data writer (`app.go:1486`), so the product's attempts to write captions and SCTE-104 to it fail with "no data writer set" |
 | SRT source, mode `listener` | `--srt-listen` (one shared listener, port allocated) | Key `srt:<streamId>` |
-| SRT source, mode `caller`: `address`, `streamId`, `latencyMs`, `inputBandwidthMbps`, `overheadPercent` | `POST /api/sources` once | `inputBW` = Mbit/s × 125 000 |
+| SRT source, mode `caller`: `address`, `streamId`, `latencyMs`, `inputBandwidthMbps`, `overheadPercent` | `POST /api/sources` once | `address` is `host:port` (`^[A-Za-z0-9.-]+:[0-9]{1,5}$`). `inputBW` = Mbit/s × 125 000 |
 | SRT source `latencyMs` (listener) | Most common value to `--srt-latency` | Others: `PUT /api/sources/{key}/srt` |
 | `<source>.source.label` | `POST /api/sources/{key}/label` | Max 64 characters |
 | `<source>.source.position` | `PUT /api/sources/{key}/position` | Multiview order |
@@ -90,7 +90,7 @@ are resolved by the orchestrator.
 | `encoder.encoder.gopSeconds` / `preset` / `timecode` | `--output-gop-secs` / `--output-preset` / `--output-timecode` | |
 | `srt-out.srt.*`, mode caller | `POST /api/output/destinations` type `srt-caller`, then `…/{id}/start` | Not persisted by the product: recreated, matched by `name` = block id. `maxBandwidth` in bytes/s. `passphrase` is a secret. Mode listener isn't available: no output ports |
 | `rtmp-out.rtmp.url` / `streamKey` | Destination type `rtmp`, `url` / `streamID` | Stream key is a secret |
-| `recording` on; `recording.recording.*` | `POST /api/recording/start` `{outputDir: "/recordings", rotateAfterMins, maxFileSizeMB, filenamePrefix}` | Restarted when stopped unexpectedly |
+| `recording` on; `recording.recording.*` | `POST /api/recording/start` `{outputDir: "/recordings", rotateAfterMins, maxFileSizeMB, filenamePrefix}` | Restarted when stopped unexpectedly. `rotateAfterMinutes` is at least 1: the product treats 0 as 60 |
 | `recording.recording.storageGiB` | Size of the recordings volume | Orchestrator only; required when on, default 50 |
 | `audio.master.limiter` | `PUT /api/audio/limiter` `{threshold, ceiling}` | |
 | `replay` on/off; `replay.replay.bufferSeconds` | `--replay-buffer-secs` (0 when off) | |
@@ -99,7 +99,7 @@ are resolved by the orchestrator.
 | `captions` on; `captions.captions.mode` | `--captions`, `POST /api/captions/mode` | `passthrough` or `author`; the toggle turns them off |
 | `captions.asr` on; `captions.asr.*` | `--asr-sidecar`, `--asr-default-backend`; `PUT /api/asr/config` `{backend, modelName, confidence, speakerDetection}` | Needs an image with the sidecar |
 | `scte35` on; `scte35.scte35.pid`, `prerollMs`, `heartbeatMs`, `verify`, `webhookUrl` | `--scte35`, `--scte35-pid`, `--scte35-preroll`, `--scte35-heartbeat`, `--scte35-verify`, `--scte35-webhook` | |
-| `scte35.scte35.defaultRule` | `PUT /api/scte35/rules/default` `{action}` | |
+| `scte35.scte35.defaultRule` | `PUT /api/scte35/rules/default` `{action}` | `pass` or `drop`: `rewrite` can't be the product's default |
 | `scte35.scte104` on | `--scte104` | Reads SCTE-104 from an MXL source's data flow (`app.go:1295`), translated to SCTE-35. Needs an `mxl-src` copy in use. Writing isn't available: the product attempts it (`app.go:1564`) but it fails with "no data writer set" |
 | `playout` on; `playout.playout.cacheMaxGB` / `asRunRetentionDays` | `--playout`, `--playout-cache-max` / `--playout-asrun-retention` | |
 | `control.control.preview*` | `--preview-proxy`, `--preview-resolution`, `--preview-bitrate` (bit/s) | |

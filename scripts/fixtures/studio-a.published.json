@@ -7,7 +7,7 @@
     "description": "Two-camera studio with an A/V sync source: the news-studio design, expressed as a published workload.",
     "uid": "9dd110d0-8c14-5c77-acf6-3eb708bf0c13",
     "revision": 1,
-    "libraryVersion": "4.0.1"
+    "libraryVersion": "4.0.2"
   },
   "spec": {
     "defaults": {

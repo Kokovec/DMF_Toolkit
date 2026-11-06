@@ -243,8 +243,11 @@ primitives still existed; the parameters now live on features). `media-primitive
   that are configuration (format, captions mode, speech-to-text, master limiter, SCTE-35 default
   rule, replay shutter angle, destinations, recording); run-time calls are excluded. Security
   settings (API and invite tokens, allowed origins) are the orchestrator's, not module settings.
-  An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`); recording declares
-  its storage (`storageGiB`, for the orchestrator). Captions are turned off with the feature toggle,
+  An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`), and its caller
+  address is `host:port` (`^[A-Za-z0-9.-]+:[0-9]{1,5}$`); recording declares its storage
+  (`storageGiB`, for the orchestrator) and rotates files at least every 1 minute (the product treats
+  0 as 60); the SCTE-35 default rule is `pass` or `drop` (the product can't default to `rewrite`).
+  Values follow the product's request bodies, checked against its source at the pinned commit. Captions are turned off with the feature toggle,
   so their mode has no `off`. The MXL program output has no data flow (`noData`): at the pinned commit
   the product passes no data writer to it, so its attempts to write captions and SCTE-104 fail
   ("no data writer set"). MXL sources keep their optional ANC port, which it reads: that's where
@@ -372,6 +375,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-02 | SCTE-104 only reads: it requires an MXL source, since writing to the programme fails without a data writer. Library 4.0.1: a real server had recorded 4.0.0, so R3.7 requires the bump. Modules stay 1.1.0 / 1.0.0: their stored parts don't change | R3.14, R7.7, R3.7 |
 | 2026-11-05 | XML publish (stage 2 of the orchestration build, `03-toolkit-spec.md` §9): `published.xml` route, *Publish XML*, `src/model/xml.ts`, schema copy, shared fixtures and `npm test` | R8.6 |
 | 2026-11-05 | Stage 2 review: XML encodability is a publish problem (the JSON route, XML route and canvas agree); workload, function and external ids follow the schema's `Id`, checked on save; MXL history ≥ 1 ms; `toPublished` drops `flowOptions` | R8.6, R8.7, R5.6 |
+| 2026-11-05 | From the compiler's check of Switchframe's request bodies: SRT caller address is `host:port`, SCTE-35 default rule `pass` / `drop`, recording rotation ≥ 1 min. Library 4.0.2 (a server recorded 4.0.1); `switchframe.1` stays 1.1.0: the change narrows what's accepted without changing what a value means, and no saved workload uses it | R7.7, R3.7, R3.5 |
 
 ## Open questions
 

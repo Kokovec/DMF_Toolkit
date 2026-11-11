@@ -129,7 +129,7 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
               onCounts={(inputs) => onChange(withSelection(data, prim, { inputs }))}
               whyNot={whyNot}
               choices={choices}
-              conflicts={() => []}
+              conflicts={(copy) => conflictsOf(prim, data, copy)}
               schema={schema}
               params={params}
               onGroup={setGroup}

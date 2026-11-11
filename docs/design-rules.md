@@ -244,7 +244,7 @@ primitives still existed; the parameters now live on features). `media-primitive
   does: an enabled key is over programme all the time; a 300 s replay buffer holds only up to about
   5.6 Mbit/s per source; the SCTE-35 default rule `drop` also drops operators' cues; the default of
   2 CPUs covers an all-features 1080p design (`defaults.notes.resources`, shown in the Setup tab).
-  RTMP can't run with an HEVC colour profile (R8.8). Ports, TLS, state/cache paths, DPDK, GPU builds and
+  RTMP can't run with an HEVC colour profile, and 720p can't run with MXL (R8.8). Ports, TLS, state/cache paths, DPDK, GPU builds and
   active-active pairs are the orchestrator's. Mapping to the product: `products/switchframe.md`;
   example module: `catalogs/switchframe.catalog.json`.
   Per source (every switcher input): label, multiview position, alignment delay; audio channel
@@ -318,9 +318,11 @@ primitives still existed; the parameters now live on features). `media-primitive
   With no facility set, everything is offered. **Product limits** (`rules.conflictsWith`: a block
   can't run while another function has one of the listed values) are the exception: no facility
   can honour them, so they're publish problems with or without one, one per copy, naming the value
-  and its path; the dialog shows them on the output's row. So far: an RTMP output with colour profile
+  and its path; the dialog shows them on the input's or output's row. So far: an RTMP output with colour profile
   `standard-hevc` or `professional` (the product's HEVC → H.264 transcoder isn't wired up, so it would
-  report active and send nothing). *Enforced by:* `facilityProblems`, `productProblems`
+  report active and send nothing); a Switchframe MXL source or MXL output with `engine.engine.resolution`
+  `1280x720` (SwitchFrame's V210 path needs a frame width divisible by 6, so every MXL frame fails). A
+  `dmf-mxl` source at 720p stays allowed: only the switcher can't read it. *Enforced by:* `facilityProblems`, `productProblems`
   (`src/model/facility.ts`), `publishProblems` (`workload.ts`), `checkLibrary`, `server/main.ts`,
   `server/app.ts`, `FunctionDialog.tsx`, `SchemaForm.tsx`, `FunctionSetup.tsx`, `tests/facility.test.ts`.
 - **R8.9 Publishing refuses every value the orchestrator's compiler would refuse,** so a design built
@@ -447,6 +449,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-11 | Stage 7A review: publishing refuses every value the compiler would refuse (MXL flow format and writer, SRT stream ID unique per function, label ≤ 128 bytes, SRT output address, RTMP URL, recording prefix and size against the facility's limit, SCTE-35 webhook, CPU > 0, memory ≥ 512 MiB, `extraArgs`), with the compiler's parameter paths; key fill source becomes a choice of input copies (it was described as a label). SRT caller address follows the compiler's `HOST_PORT`. Library stays 4.1.0 and `switchframe.1` 1.1.0: neither 4.1.0 nor this was committed or recorded, and no saved workload uses them. Resolves the open question from 7A | R8.9, R5.9, R4.5, R7.7, R8.8 |
 | 2026-11-11 | From the compiler's run on the 7A cases: at most one `switchframe.1` per workload (`maxPerWorkload`, compiler rule 2) is a publish problem naming the functions, with or without a facility. `readsFrom` stays, but can't fire while that holds. Case `mxl-writer` replaced by `switchframe-count` | R8.9 |
 | 2026-11-11 | Ruling: function and domain counts are the orchestrator's limits, so they come from the facility export (`limits.functionsPerWorkload`, `limits.domainsPerWorkload`), checked only while a facility is set; `maxPerWorkload` removed from the module (it was never committed). Cases `no-switchframe` and `two-domains` added | R8.9, R8.8; supersedes the previous line's `maxPerWorkload` |
+| 2026-11-11 | From stage 7B: 720p on a `switchframe.1` instance with an MXL source or `mxl-out` is a product limit (`conflictsWith` on `switcher.input.mxl` / `switcher.output.mxl`), one problem per copy naming `engine.engine.resolution`, as the compiler does; 720p without MXL and `dmf-mxl` sources at 720p stay allowed. The dialog shows it on the input rows too. Library 4.1.1 (4.1.0 was committed); `switchframe.1` stays 1.1.0: narrowing, and no saved workload uses it (contract, module versions) | R8.8, R3.7, R3.5 |
 
 ## Open questions
 

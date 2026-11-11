@@ -181,7 +181,7 @@ export function shapeProblems(doc: Pick<WorkloadDescription, 'spec'>, facility: 
 }
 
 // Product limits: a block in use that can't run with what another function of the instance is set
-// to (e.g. RTMP with an HEVC colour profile). With or without a facility. One problem per copy.
+// to (e.g. RTMP with an HEVC colour profile, MXL at 720p). With or without a facility. One problem per copy.
 export function productProblems(prim: VendorModule, f: Pick<FunctionInstance, 'parameters'> & InstanceSelection): string[] {
   const design = instanceDesign(prim, f)
   const errors: string[] = []

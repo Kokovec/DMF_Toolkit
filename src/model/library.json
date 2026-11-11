@@ -2,7 +2,7 @@
   "apiVersion": "dmf-toolkit/v1alpha4",
   "kind": "FeatureLibrary",
   "metadata": {
-    "version": "4.1.0",
+    "version": "4.1.1",
     "description": "Feature library: categories, features (with their design rules) and the shared vocabulary. Bump the version on every change; the server refuses a changed file with an unchanged version."
   },
   "spec": {
@@ -1737,7 +1737,19 @@
           "switcher.option.source",
           "switcher.option.audio",
           "switcher.option.key"
-        ]
+        ],
+        "rules": {
+          "conflictsWith": [
+            {
+              "feature": "switcher.engine",
+              "path": "engine.resolution",
+              "values": [
+                "1280x720"
+              ],
+              "message": "can't run with resolution {value}: SwitchFrame's V210 path needs a frame width divisible by 6, and 1280 isn't, so every MXL frame fails. Use 1080p or 2160p"
+            }
+          ]
+        }
       },
       {
         "id": "switcher.input.st2110",
@@ -2490,7 +2502,19 @@
         "needs": [
           "mxl"
         ],
-        "mxlOutputs": true
+        "mxlOutputs": true,
+        "rules": {
+          "conflictsWith": [
+            {
+              "feature": "switcher.engine",
+              "path": "engine.resolution",
+              "values": [
+                "1280x720"
+              ],
+              "message": "can't run with resolution {value}: SwitchFrame's V210 path needs a frame width divisible by 6, and 1280 isn't, so every MXL frame fails. Use 1080p or 2160p"
+            }
+          ]
+        }
       },
       {
         "id": "switcher.output.st2110",

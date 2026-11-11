@@ -55,6 +55,8 @@ The feature library has a **Production switcher** section with these groups. The
   - the encoder needs at least one codec;
   - resolution × rate must be a Switchframe format (`x-allowed`): 1080p at 23.976, 24, 25, 29.97, 30, 50,
     59.94, 60; 720p and 2160p at 25, 29.97, 30, 50, 59.94, 60;
+  - 720p can't run with an MXL source or MXL output (V210 needs a width divisible by 6), a product limit
+    named at `engine.engine.resolution`;
   - `engine.engine.onAirAtStart` must name an input copy in use (unset: the first, published explicitly);
   - each feature is at most once per module.
 
@@ -66,7 +68,7 @@ are resolved by the orchestrator.
 
 | Module setting | Switchframe | Notes |
 |---|---|---|
-| `engine.engine.resolution` + `rate` | `--format` (e.g. `1080p29.97`) | The model refuses combinations that aren't formats |
+| `engine.engine.resolution` + `rate` | `--format` (e.g. `1080p29.97`) | The model refuses combinations that aren't formats. 720p is refused with an MXL source or `mxl-out` (a product limit): SwitchFrame's V210 converters need a frame width divisible by 6, and 1280 isn't, so every MXL frame would fail. 720p without MXL is allowed |
 | `engine.engine.colorProfile` | `--color-format` | `standard` / `standard-hevc` / `professional` |
 | `engine.engine.frameSync` | `off`: none; `freerun`: `--frame-sync`; `source-driven`: `--low-latency-sync` | Leave off for MXL sources |
 | `engine.engine.frameRateConversion` | `--frc-quality` | |

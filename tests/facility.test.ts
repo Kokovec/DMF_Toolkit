@@ -12,7 +12,7 @@ import { Store } from '../server/db'
 import { CAPABILITIES, checkFacility, facilityProblems } from '../src/model/facility'
 import { checkLibrary, LIBRARY } from '../src/model/library'
 import type { Facility, FunctionInstance, JsonValue, ModuleCatalog, WorkloadDescription } from '../src/model/types'
-import { publishProblems } from '../src/model/workload'
+import { publishProblems, withSelection, type FnData } from '../src/model/workload'
 
 // The orchestrator's export (`make facility-export` in switchframe-dmf), read where it lives.
 const EXPORT =
@@ -166,6 +166,52 @@ describe('product limits, with or without a facility', () => {
     const doc = studioA(catalog)
     group(mixer(doc), 'engine.engine').colorProfile = 'professional'
     assert.deepEqual(publishProblems(doc, catalog, NONE), [])
+  })
+  // 720p with MXL (stage 7B): SwitchFrame's V210 path needs a width divisible by 6, and 1280 isn't.
+  const select = (doc: WorkloadDescription, chosen: Parameters<typeof withSelection>[2]) => {
+    const f = mixer(doc)
+    const { kind: _kind, ...next } = withSelection({ kind: 'fn', ...f, settings: f.settings ?? {} } as FnData, catalog.get('switchframe.1')!, chosen)
+    Object.assign(f, next)
+  }
+  // The reference workload at 720p, or with the cameras' wires gone and SRT in their place.
+  const at720 = (mxl: { src: boolean; out: boolean }) => {
+    const doc = studioA(catalog)
+    if (!mxl.src) {
+      select(doc, { inputs: { 'mxl-src': 0, 'srt-src': 1 } })
+      doc.spec.externals.push({ id: 'remote', kind: 'source', name: 'Remote', reference: { kind: 'srt', value: 'remote-a' } })
+      doc.spec.wires = [...doc.spec.wires.filter((w) => !w.to.startsWith('vision-mixer/')), { from: 'remote/stream', to: 'vision-mixer/srt-src.in.video' }]
+      group(mixer(doc), 'srt-src.srt').streamId = 'remote-a'
+      group(mixer(doc), 'srt-src.payload.pathA').bitrateMbps = 20
+      group(mixer(doc), 'engine.engine').onAirAtStart = 'srt-src'
+    }
+    if (!mxl.out) {
+      select(doc, { outputs: { 'mxl-out': 0, 'srt-out': 1 } })
+      Object.assign(group(mixer(doc), 'srt-out.srt'), { address: 'cdn.example.net', port: 9000 })
+    }
+    group(mixer(doc), 'engine.engine').resolution = '1280x720'
+    return doc
+  }
+  const v210 = (doc: WorkloadDescription, facility: Facility = NONE) => publishProblems(doc, catalog, facility).filter((p) => p.includes('V210'))
+  const at720Problem = (copy: string) =>
+    new RegExp(`^vision-mixer: ${copy}: can't run with resolution 1280x720: SwitchFrame's V210 path needs a frame width divisible by 6, .*\\(engine\\.engine\\.resolution\\)$`)
+  for (const facility of [LOCAL, NONE])
+    test(`720p with MXL sources is refused, each source named (${facility.name ?? 'no facility'})`, () => {
+      const problems = v210(at720({ src: true, out: false }), facility)
+      assert.equal(problems.length, 3)
+      ;['mxl-src', 'mxl-src_2', 'mxl-src_3'].forEach((copy, i) => assert.match(problems[i], at720Problem(copy)))
+    })
+  test('720p with MXL output alone is refused', () => {
+    const problems = v210(at720({ src: false, out: true }))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], at720Problem('mxl-out'))
+  })
+  test('720p without MXL publishes', () => {
+    assert.deepEqual(publishProblems(at720({ src: false, out: false }), catalog, LOCAL), [])
+  })
+  test('a dmf-mxl source at 720p is not refused: only the switcher can\'t read it', () => {
+    const doc = at720({ src: false, out: false })
+    for (const id of ['cam1', 'cam2']) group(doc.spec.functions.find((f) => f.id === id)!, 'mxl.format.video').frameSize = '1280x720'
+    assert.deepEqual(v210(doc), [])
   })
   const ranges: [string, string, number, string][] = [
     ['EQ low frequency', 'mxl-src.audio.eq.low', 50, 'frequencyHz: must be ≥ 80'],

@@ -79,6 +79,38 @@ of truth and the copy here is byte-identical (a test checks its hash). In short:
 - **Fixtures:** `scripts/fixtures/studio-a` and `every-value` (`.workload.xml` + `.published.json`, from
   `npx tsx scripts/fixtures/write-xml.ts`) are the round-trip fixtures both repos test.
 
+## What the facility can run (input from the orchestrator)
+
+The one thing the configurator reads from the orchestrator is what the facility declares it can
+run, so users don't design what can't deploy. It's never part of the published state.
+
+- **Source:** `make facility-export` in `switchframe-dmf` writes `.state/facility-<name>.json`
+  (`kind: FacilityExport`, `name`, `capabilities` id → boolean, `limits`). The server reads the file
+  named by `DMF_FACILITY` at start (it refuses to start if that file is unreadable or invalid) and
+  serves `{name, capabilities, limits}` at `GET /api/facility`, or `{}` when it's unset. Limits are
+  used by parameters that name one (`x-facilityLimit`, e.g. recording storage ≤ `maxRecordingGiB`)
+  and for the workload's shape: `functionsPerWorkload` (`{<type>: {min, max}}`) and
+  `domainsPerWorkload`, with every function in a workload domain.
+- **Capabilities** are the library's `vocabulary.capabilities`, exactly the export's keys (a test
+  checks): `mxl`, `srt-in`, `srt-caller-out`, `rtmp-out`, `recording`, `srt-listener-out`, `st2110`,
+  `moq`, `gpu`, `asr`, `neural-key`, `ai-segment`, `scte104`. A capability the file doesn't list counts
+  as unavailable, as in the compiler.
+- **What needs what** is library data: a feature's `needs` (its options' needs count too), an enum
+  value's `x-enumNeeds`, and the engine's rule that a resource profile with a GPU needs `gpu`. For
+  `switchframe.1` this mirrors the compiler's gates (`tools/dmf_compile/products/switchframe.py`).
+- **Effect:** the function dialog doesn't offer what the facility lacks and says why; a workload
+  that already uses it (saved earlier, or imported) can still be saved, but each such option is a
+  publish problem naming it, so both publish routes answer 422. With no facility set, everything is
+  offered. The configurator decides nothing here: it only mirrors the facility's declaration, and the
+  compiler stays the authority.
+- **Product limits** are separate (`rules.conflictsWith`): no facility can honour them, so they are
+  publish problems with or without a facility, e.g. an RTMP output with colour profile
+  `standard-hevc` or `professional`.
+- **Everything else the compiler refuses** is refused at publish too, naming the compiler's parameter
+  path (design rule R8.9): function and domain counts within the facility's limits, MXL flow formats and writers, unique SRT stream IDs, label bytes, address,
+  URL and file-name forms, resources, `settings.extraArgs`. Only the checks that need a facility's
+  limits are skipped without one. The compiler keeps every check for hand-edited XML.
+
 ## What the orchestrator configures
 
 - Creates and manages the lifecycle of **MXL domains and flows**, using the flow ids and formats
@@ -156,3 +188,8 @@ of truth and the copy here is byte-identical (a test checks its hash). In short:
   with an explicit value.
 - **XML handover** (2026-11-05): the published revision is also served as XML
   (`/published.xml`), the format the orchestrator reads; the JSON route stays.
+- **Facility capabilities and product limits** (2026-11-11, library 4.1.0): publishing refuses what
+  the facility set by `DMF_FACILITY` doesn't offer, and what the product can't do (RTMP with an HEVC
+  colour profile) on any facility, and every value the compiler refuses (R8.9). A key's
+  `fillSource` is an input copy id (it was a label) and stays unset for "this source". The published
+  document's shape is otherwise unchanged.

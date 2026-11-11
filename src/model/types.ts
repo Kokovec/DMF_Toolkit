@@ -73,6 +73,9 @@ export type JsonSchema = {
   default?: JsonValue
   minimum?: number
   maximum?: number
+  exclusiveMinimum?: number // numbers must be greater than this
+  'x-maxBytes'?: number // text: at most this many bytes as UTF-8 (a product's limit, not characters)
+  'x-patternMessage'?: string // what to say when `pattern` doesn't match, instead of the expression
   format?: string // 'secret-ref' marks a secret reference
   pattern?: string // string values must match this regular expression
   'x-protocols'?: string[] // property applies only to modules using one of these protocols
@@ -92,6 +95,17 @@ export type JsonSchema = {
   'x-allowed'?: XAllowed
   // The choices aren't fixed: they come from the instance. "inputs" = its input copies in use.
   'x-options'?: 'inputs'
+  // With x-options: unset (or empty) is allowed and means this, e.g. "This source"; it isn't
+  // resolved to the first choice when publishing.
+  'x-emptyLabel'?: string
+  // The value must differ between the copies of this block in one function, e.g. an SRT stream ID.
+  'x-unique'?: boolean
+  // At most the facility's limit of this name (its export's `limits`), checked only while a facility
+  // is set, e.g. "maxRecordingGiB".
+  'x-facilityLimit'?: string
+  // Values that need facility capabilities (vocabulary.capabilities), e.g. { "neural": ["neural-key"] }.
+  // A facility that lacks one doesn't offer the value; with no facility set, every value is offered.
+  'x-enumNeeds'?: Record<string, string[]>
 }
 
 // Valid combinations of two fields of a group: values[<first field's value>] = the second field's
@@ -154,7 +168,12 @@ export type VendorModule = {
     resources?: ResourceProfile
     discovery?: Discovery
     parameters?: { [block: string]: JsonValue } // over the schema's defaults, for a new instance only
+    // Help shown with a starting value, e.g. what the default resource profile covers
+    notes?: { resources?: string }
   }
+  // What the product accepts in an instance's own setup: known vendor settings keys (other keys
+  // pass through unchecked, R4.5) and the resource profile, e.g. at least 512 MiB of memory.
+  setupSchema?: { settings?: JsonSchema; resources?: JsonSchema }
 }
 
 export type ModuleCatalog = {
@@ -317,6 +336,9 @@ export type FeatureDef = {
   key?: string // parameter group name inside the block (e.g. "srt", "network")
   merge?: string // add-on / option: merge its parameters into this group of the block instead (e.g. bonding -> "srt")
   parameters?: { schema: JsonSchema }
+  // Facility capabilities (vocabulary.capabilities) this feature needs to run. A facility that
+  // lacks one doesn't offer it; with no facility set, it's offered.
+  needs?: string[]
   rules?: {
     attachTo?: string[] // add-on: feature ids it can attach to ("input.*" = any input)
     maxPerBlock?: number // add-on: how many times per block
@@ -325,6 +347,9 @@ export type FeatureDef = {
     // the module must also have a block matching one of these feature ids ("input.*" patterns),
     // e.g. SRT program outputs need a program encoder
     requires?: { anyOf: string[]; message: string }[]
+    // Product limits: the block can't run while another function of the instance has one of these
+    // values (its block-relative parameter `path`, default if unset). `message` may use {value}.
+    conflictsWith?: { feature: string; path: string; values: (string | number | boolean)[]; message: string }[]
   }
 }
 
@@ -341,7 +366,18 @@ export type ModuleBlock = {
   // Narrows a parameter group of this product, by its path in the block (e.g. "format.video"):
   // the product only offers these combinations of what the shared feature allows.
   allowed?: Record<string, XAllowed>
+  // MXL input blocks: the functions it can read from, by module type pattern ("dmf-mxl.*").
+  readsFrom?: string[]
+  // MXL blocks: the formats of the flows it reads or writes (see FlowFormatRule).
+  flowFormat?: Partial<Record<'video' | 'audio', FlowFormatRule>>
 }
+
+// Per flow field: the values allowed (as text: "progressive", "48000", 2), or "function": the same
+// as the function's own format (its parameters tagged x-flow, e.g. a switcher's programme format).
+// A transfer the flow doesn't state passes. Fields: mediaType, frameSize ("WxH"), grainRate,
+// interlace, colorspace, transfer, sampleRate, channelCount.
+export type FlowFormatRule = Partial<Record<FlowFormatField, (string | number)[] | 'function'>>
+export type FlowFormatField = 'mediaType' | 'frameSize' | 'grainRate' | 'interlace' | 'colorspace' | 'transfer' | 'sampleRate' | 'channelCount'
 
 export type InputRule = 'one' | 'several'
 
@@ -371,6 +407,20 @@ export type Vocabulary = {
   references: { id: ExternalRefKind; label: string; source: string; destination: string }[]
   // Who can be given access to a workload: the roles offered (at least one user each if required)
   access: { roles: { id: string; label: string; required?: boolean }[]; usernamePattern: string }
+  // What a facility can declare it runs (the keys of its export, `make facility-export`). Features
+  // and values that need one are offered only if the facility has it (or no facility is set).
+  capabilities: { id: string; label: string; description: string }[]
+}
+
+// What the facility declares it can run, from the orchestrator's export (DMF_FACILITY on the
+// server, GET /api/facility). Empty = no facility set: everything is offered.
+export type Facility = { name?: string; capabilities?: Record<string, boolean>; limits?: FacilityLimits }
+// The facility's limits: numbers named by parameters (`x-facilityLimit`, e.g. maxRecordingGiB) and the
+// workload's shape: how many functions of a type ({min, max}) and how many MXL domains.
+export type FacilityLimits = {
+  functionsPerWorkload?: Record<string, { min?: number; max?: number }>
+  domainsPerWorkload?: number
+  [name: string]: number | Record<string, { min?: number; max?: number }> | undefined
 }
 
 export type FeatureLibrary = {

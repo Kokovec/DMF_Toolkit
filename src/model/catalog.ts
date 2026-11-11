@@ -199,11 +199,17 @@ export function checkModule(x: unknown): string[] {
   }
   const schemaErrors = checkParameterSchema(p.parameters?.schema)
   errors.push(...schemaErrors.map((e) => `core parameters: ${e}`))
+  for (const part of ['settings', 'resources'] as const) {
+    const schema = p.setupSchema?.[part]
+    if (schema) errors.push(...checkParameterSchema(schema).map((e) => `setupSchema.${part}: ${e}`))
+  }
   // What a new instance starts with must itself be valid.
   if (!design.length && p.defaults) {
     if (p.defaults.inputs) errors.push(...inputSelectionProblems(p, p.defaults.inputs).map((e) => `defaults: ${e}`))
     if (p.defaults.outputs) errors.push(...outputSelectionProblems(p, p.defaults.outputs).map((e) => `defaults: ${e}`))
     if (p.defaults.discovery && typeof p.defaults.discovery.register !== 'boolean') err('defaults: discovery needs register true or false')
+    if (p.defaults.notes !== undefined && (typeof p.defaults.notes !== 'object' || Object.values(p.defaults.notes).some((v) => typeof v !== 'string')))
+      err('defaults: notes must be text')
     const running = composeModule(instanceDesign(p)).schema
     for (const [block, value] of Object.entries(p.defaults.parameters ?? {})) {
       const schema = running.properties?.[block]

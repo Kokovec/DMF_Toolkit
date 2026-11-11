@@ -2,7 +2,7 @@
 // the downstream DMF orchestrator pulls.
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { checkCatalog, checkModule, ID_RE } from '../src/model/catalog'
-import { INSTANCE_ID_RE, type ModuleCatalog, type VendorModule, type WorkloadDescription } from '../src/model/types'
+import { INSTANCE_ID_RE, type Facility, type ModuleCatalog, type VendorModule, type WorkloadDescription } from '../src/model/types'
 import { LIBRARY } from '../src/model/library'
 import { checkWorkload, publishProblems, toPublished } from '../src/model/workload'
 import { toWorkloadXml, XmlEncodeError } from '../src/model/xml'
@@ -11,7 +11,8 @@ import { HttpError, Store } from './db'
 type Handler = (ctx: { params: string[]; query: URLSearchParams; body: () => Promise<unknown> }) => unknown
 type Route = { method: string; pattern: RegExp; handler: Handler }
 
-export function createApp(store: Store) {
+// `facility`: what the facility declares it can run (DMF_FACILITY), {} when none is set.
+export function createApp(store: Store, { facility = {} }: { facility?: Facility } = {}) {
   const routes: Route[] = []
   const route = (method: string, path: string, handler: Handler) =>
     routes.push({ method, pattern: new RegExp(`^${path.replace(/:\w+/g, '([^/]+)')}$`), handler })
@@ -20,6 +21,9 @@ export function createApp(store: Store) {
   route('GET', '/api/library', () => LIBRARY)
   route('GET', '/api/library/versions', () => ({ current: LIBRARY.metadata.version, versions: store.libraryVersions() }))
   route('GET', '/api/library/:version', ({ params: [version] }) => store.getLibrary(version))
+
+  // ---- Facility (read-only: exported by the orchestrator, DMF_FACILITY) ----
+  route('GET', '/api/facility', () => (facility.capabilities ? { name: facility.name, capabilities: facility.capabilities, limits: facility.limits ?? {} } : {}))
 
   // ---- Vendor modules ----
   route('GET', '/api/modules', () => ({ modules: store.listModules() }))
@@ -73,7 +77,7 @@ export function createApp(store: Store) {
   const published = (id: string, query: URLSearchParams) => {
     const rev = query.get('revision')
     const { revision, document } = store.getWorkload(id, rev === null ? undefined : Number(rev))
-    const problems = publishProblems(document, store.catalog())
+    const problems = publishProblems(document, store.catalog(), facility)
     if (problems.length) throw new HttpError(422, `revision ${revision} is not publishable`, problems)
     return toPublished(document, revision, store.catalog())
   }

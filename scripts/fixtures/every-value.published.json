@@ -7,7 +7,7 @@
     "description": "Studio A & \"B\"\n\tsecond line\r\nthird <line>",
     "uid": "9dd110d0-8c14-5c77-acf6-3eb708bf0c13",
     "revision": 3,
-    "libraryVersion": "4.0.2"
+    "libraryVersion": "4.1.0"
   },
   "spec": {
     "defaults": {

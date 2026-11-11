@@ -61,6 +61,19 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
   if (!access?.roles?.length || !access.usernamePattern) errors.push('vocabulary: access needs roles and a usernamePattern')
   else if (new Set(access.roles.map((r) => r.id)).size !== access.roles.length) errors.push('vocabulary: access role ids must be unique')
 
+  // Facility capabilities: the keys of the orchestrator's facility export
+  const capabilities = new Set<string>()
+  for (const c of v.capabilities ?? []) {
+    if (!ID_RE.test(c.id) || capabilities.has(c.id)) errors.push(`vocabulary: capability "${c.id}" must be unique and valid`)
+    if (!c.label || !c.description) errors.push(`vocabulary: capability ${c.id} needs a label and a description`)
+    capabilities.add(c.id)
+  }
+  if (!capabilities.size) errors.push('vocabulary: capabilities are required')
+  const unknownCaps = (needs: unknown, at: string) =>
+    !Array.isArray(needs) || !needs.length
+      ? [`${at}: needs must be a non-empty list of capabilities`]
+      : needs.filter((n) => !capabilities.has(n)).map((n) => `${at}: needs unknown capability "${n}"`)
+
   const cats = new Set<string>()
   for (const c of lib.spec.categories) {
     if (!ID_RE.test(c.id) || cats.has(c.id)) errors.push(`category ${c.id}: id must be unique and valid`)
@@ -104,6 +117,10 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
         )
       const walk = (node: JsonSchema, path: string) => {
         if (node['x-flow'] && !FLOW_FIELDS.includes(node['x-flow'])) errors.push(`${at}: ${path}: unknown x-flow "${node['x-flow']}"`)
+        for (const [value, needs] of Object.entries(node['x-enumNeeds'] ?? {})) {
+          if (!node.enum?.map(String).includes(value)) errors.push(`${at}: ${path}: x-enumNeeds "${value}" isn't one of its values`)
+          errors.push(...unknownCaps(needs, `${at}: ${path}: x-enumNeeds "${value}"`))
+        }
         for (const [k, child] of Object.entries(node.properties ?? {})) walk(child, path ? `${path}.${k}` : k)
       }
       walk(f.parameters.schema, '')
@@ -124,6 +141,19 @@ export function checkLibrary(lib: FeatureLibrary = LIBRARY): string[] {
         errors.push(`feature ${f.id}: includes "${id}": only blocks include, and only options`)
     if (f.kind === 'option' && !lib.spec.features.some((g) => g.includes?.includes(f.id))) errors.push(`feature ${f.id}: no block includes this option`)
     if (f.merge && !lib.spec.features.some((g) => g.key === f.merge)) errors.push(`feature ${f.id}: merge target "${f.merge}" is no feature's group`)
+    if (f.needs !== undefined) errors.push(...unknownCaps(f.needs, `feature ${f.id}`))
+    for (const c of f.rules?.conflictsWith ?? []) {
+      const other = lib.spec.features.find((g) => g.id === c.feature)
+      const [key, ...rest] = (c.path ?? '').split('.')
+      let node: JsonSchema | undefined = other?.key === key ? other.parameters?.schema : undefined
+      for (const k of rest) node = node?.properties?.[k]
+      if (f.kind !== 'block') errors.push(`feature ${f.id}: only blocks have conflictsWith`)
+      if (!other || other.kind !== 'block') errors.push(`feature ${f.id}: conflictsWith "${c.feature}" is no block feature`)
+      else if (!node || !rest.length) errors.push(`feature ${f.id}: conflictsWith path "${c.path}" isn't a parameter of ${c.feature} (start with its group "${other.key}")`)
+      else if (!c.values?.length || (node.enum && c.values.some((x) => !node!.enum!.includes(x as string | number))))
+        errors.push(`feature ${f.id}: conflictsWith values must be values of ${c.path}`)
+      if (!c.message) errors.push(`feature ${f.id}: conflictsWith needs a message`)
+    }
   }
   return errors
 }

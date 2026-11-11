@@ -50,7 +50,39 @@
               "id": "mxl-src",
               "feature": "switcher.input.mxl",
               "addons": [],
-              "scaleOut": 8
+              "scaleOut": 8,
+              "readsFrom": [
+                "dmf-mxl.*"
+              ],
+              "flowFormat": {
+                "video": {
+                  "mediaType": [
+                    "video/v210"
+                  ],
+                  "frameSize": "function",
+                  "grainRate": "function",
+                  "interlace": [
+                    "progressive"
+                  ],
+                  "colorspace": [
+                    "BT709"
+                  ],
+                  "transfer": [
+                    "SDR"
+                  ]
+                },
+                "audio": {
+                  "mediaType": [
+                    "audio/float32"
+                  ],
+                  "sampleRate": [
+                    "48000"
+                  ],
+                  "channelCount": [
+                    2
+                  ]
+                }
+              }
             },
             {
               "id": "st2110-src",
@@ -183,7 +215,36 @@
               "id": "mxl-out",
               "feature": "switcher.output.mxl",
               "addons": [],
-              "noData": true
+              "noData": true,
+              "flowFormat": {
+                "video": {
+                  "mediaType": [
+                    "video/v210"
+                  ],
+                  "frameSize": "function",
+                  "grainRate": "function",
+                  "interlace": [
+                    "progressive"
+                  ],
+                  "colorspace": [
+                    "BT709"
+                  ],
+                  "transfer": [
+                    "SDR"
+                  ]
+                },
+                "audio": {
+                  "mediaType": [
+                    "audio/float32"
+                  ],
+                  "sampleRate": [
+                    "48000"
+                  ],
+                  "channelCount": [
+                    2
+                  ]
+                }
+              }
             },
             {
               "id": "st2110-out",
@@ -369,13 +430,15 @@
                             "caller"
                           ]
                         },
-                        "pattern": "^[A-Za-z0-9.-]+:[0-9]{1,5}$"
+                        "pattern": "^[^\\s:/]+:[0-9]{1,5}$|^\\[[0-9A-Fa-f:.]+\\]:[0-9]{1,5}$",
+                        "x-patternMessage": "must be host:port"
                       },
                       "streamId": {
                         "type": "string",
                         "title": "Stream ID",
                         "description": "Identifies this source on the shared listener (listener) or is sent to the source (caller). Letters, digits, _ and -, at most 64.",
-                        "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                        "x-unique": true
                       },
                       "latencyMs": {
                         "type": "integer",
@@ -408,6 +471,7 @@
                     "properties": {
                       "label": {
                         "type": "string",
+                        "x-maxBytes": 128,
                         "title": "Label",
                         "description": "Shown on the multiview (max 64 characters)."
                       },
@@ -551,6 +615,7 @@
                       "eq": {
                         "type": "object",
                         "title": "Equaliser",
+                        "description": "Ranges are the mixer's: low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4.",
                         "properties": {
                           "low": {
                             "type": "object",
@@ -564,8 +629,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 80,
+                                "maximum": 1000,
                                 "default": 100,
                                 "x-when": {
                                   "enabled": [
@@ -576,8 +641,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -588,8 +653,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -611,8 +676,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 200,
+                                "maximum": 8000,
                                 "default": 1000,
                                 "x-when": {
                                   "enabled": [
@@ -623,8 +688,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -635,8 +700,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -658,8 +723,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 1000,
+                                "maximum": 16000,
                                 "default": 8000,
                                 "x-when": {
                                   "enabled": [
@@ -670,8 +735,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -682,8 +747,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -753,7 +818,13 @@
                           "luma",
                           "neural"
                         ],
-                        "default": "off"
+                        "default": "off",
+                        "x-enumNeeds": {
+                          "neural": [
+                            "neural-key"
+                          ]
+                        },
+                        "description": "An enabled key is composited over programme all the time, from when it's applied: chroma or luma here means always keyed."
                       },
                       "keyColorY": {
                         "type": "integer",
@@ -866,7 +937,9 @@
                       "fillSource": {
                         "type": "string",
                         "title": "Fill source",
-                        "description": "Label of the source giving the fill; empty = this source.",
+                        "description": "The input copy giving the fill; empty = this source.",
+                        "x-options": "inputs",
+                        "x-emptyLabel": "This source",
                         "x-when": {
                           "type": [
                             "chroma",
@@ -1111,6 +1184,7 @@
                     "properties": {
                       "label": {
                         "type": "string",
+                        "x-maxBytes": 128,
                         "title": "Label",
                         "description": "Shown on the multiview (max 64 characters)."
                       },
@@ -1254,6 +1328,7 @@
                       "eq": {
                         "type": "object",
                         "title": "Equaliser",
+                        "description": "Ranges are the mixer's: low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4.",
                         "properties": {
                           "low": {
                             "type": "object",
@@ -1267,8 +1342,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 80,
+                                "maximum": 1000,
                                 "default": 100,
                                 "x-when": {
                                   "enabled": [
@@ -1279,8 +1354,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -1291,8 +1366,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -1314,8 +1389,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 200,
+                                "maximum": 8000,
                                 "default": 1000,
                                 "x-when": {
                                   "enabled": [
@@ -1326,8 +1401,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -1338,8 +1413,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -1361,8 +1436,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 1000,
+                                "maximum": 16000,
                                 "default": 8000,
                                 "x-when": {
                                   "enabled": [
@@ -1373,8 +1448,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -1385,8 +1460,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -1456,7 +1531,13 @@
                           "luma",
                           "neural"
                         ],
-                        "default": "off"
+                        "default": "off",
+                        "x-enumNeeds": {
+                          "neural": [
+                            "neural-key"
+                          ]
+                        },
+                        "description": "An enabled key is composited over programme all the time, from when it's applied: chroma or luma here means always keyed."
                       },
                       "keyColorY": {
                         "type": "integer",
@@ -1569,7 +1650,9 @@
                       "fillSource": {
                         "type": "string",
                         "title": "Fill source",
-                        "description": "Label of the source giving the fill; empty = this source.",
+                        "description": "The input copy giving the fill; empty = this source.",
+                        "x-options": "inputs",
+                        "x-emptyLabel": "This source",
                         "x-when": {
                           "type": [
                             "chroma",
@@ -1799,6 +1882,7 @@
                     "properties": {
                       "label": {
                         "type": "string",
+                        "x-maxBytes": 128,
                         "title": "Label",
                         "description": "Shown on the multiview (max 64 characters)."
                       },
@@ -1942,6 +2026,7 @@
                       "eq": {
                         "type": "object",
                         "title": "Equaliser",
+                        "description": "Ranges are the mixer's: low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4.",
                         "properties": {
                           "low": {
                             "type": "object",
@@ -1955,8 +2040,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 80,
+                                "maximum": 1000,
                                 "default": 100,
                                 "x-when": {
                                   "enabled": [
@@ -1967,8 +2052,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -1979,8 +2064,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2002,8 +2087,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 200,
+                                "maximum": 8000,
                                 "default": 1000,
                                 "x-when": {
                                   "enabled": [
@@ -2014,8 +2099,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -2026,8 +2111,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2049,8 +2134,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 1000,
+                                "maximum": 16000,
                                 "default": 8000,
                                 "x-when": {
                                   "enabled": [
@@ -2061,8 +2146,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -2073,8 +2158,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2144,7 +2229,13 @@
                           "luma",
                           "neural"
                         ],
-                        "default": "off"
+                        "default": "off",
+                        "x-enumNeeds": {
+                          "neural": [
+                            "neural-key"
+                          ]
+                        },
+                        "description": "An enabled key is composited over programme all the time, from when it's applied: chroma or luma here means always keyed."
                       },
                       "keyColorY": {
                         "type": "integer",
@@ -2257,7 +2348,9 @@
                       "fillSource": {
                         "type": "string",
                         "title": "Fill source",
-                        "description": "Label of the source giving the fill; empty = this source.",
+                        "description": "The input copy giving the fill; empty = this source.",
+                        "x-options": "inputs",
+                        "x-emptyLabel": "This source",
                         "x-when": {
                           "type": [
                             "chroma",
@@ -2281,6 +2374,7 @@
                     "properties": {
                       "label": {
                         "type": "string",
+                        "x-maxBytes": 128,
                         "title": "Label",
                         "description": "Shown on the multiview (max 64 characters)."
                       },
@@ -2424,6 +2518,7 @@
                       "eq": {
                         "type": "object",
                         "title": "Equaliser",
+                        "description": "Ranges are the mixer's: low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4.",
                         "properties": {
                           "low": {
                             "type": "object",
@@ -2437,8 +2532,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 80,
+                                "maximum": 1000,
                                 "default": 100,
                                 "x-when": {
                                   "enabled": [
@@ -2449,8 +2544,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -2461,8 +2556,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2484,8 +2579,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 200,
+                                "maximum": 8000,
                                 "default": 1000,
                                 "x-when": {
                                   "enabled": [
@@ -2496,8 +2591,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -2508,8 +2603,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2531,8 +2626,8 @@
                               "frequencyHz": {
                                 "type": "number",
                                 "title": "Frequency (Hz)",
-                                "minimum": 20,
-                                "maximum": 20000,
+                                "minimum": 1000,
+                                "maximum": 16000,
                                 "default": 8000,
                                 "x-when": {
                                   "enabled": [
@@ -2543,8 +2638,8 @@
                               "gainDb": {
                                 "type": "number",
                                 "title": "Gain (dB)",
-                                "minimum": -20,
-                                "maximum": 20,
+                                "minimum": -12,
+                                "maximum": 12,
                                 "default": 0,
                                 "x-when": {
                                   "enabled": [
@@ -2555,8 +2650,8 @@
                               "q": {
                                 "type": "number",
                                 "title": "Q",
-                                "minimum": 0.1,
-                                "maximum": 20,
+                                "minimum": 0.5,
+                                "maximum": 4,
                                 "default": 0.7,
                                 "x-when": {
                                   "enabled": [
@@ -2626,7 +2721,13 @@
                           "luma",
                           "neural"
                         ],
-                        "default": "off"
+                        "default": "off",
+                        "x-enumNeeds": {
+                          "neural": [
+                            "neural-key"
+                          ]
+                        },
+                        "description": "An enabled key is composited over programme all the time, from when it's applied: chroma or luma here means always keyed."
                       },
                       "keyColorY": {
                         "type": "integer",
@@ -2739,7 +2840,9 @@
                       "fillSource": {
                         "type": "string",
                         "title": "Fill source",
-                        "description": "Label of the source giving the fill; empty = this source.",
+                        "description": "The input copy giving the fill; empty = this source.",
+                        "x-options": "inputs",
+                        "x-emptyLabel": "This source",
                         "x-when": {
                           "type": [
                             "chroma",
@@ -2885,7 +2988,7 @@
                           "professional"
                         ],
                         "default": "standard",
-                        "description": "standard: 8-bit 4:2:0 H.264; standard-hevc: 8-bit HEVC; professional: 10-bit 4:2:2."
+                        "description": "standard: 8-bit 4:2:0 H.264; standard-hevc: 8-bit HEVC; professional: 10-bit 4:2:2. RTMP outputs need standard: Switchframe can't transcode HEVC for RTMP."
                       },
                       "colorspace": {
                         "type": "string",
@@ -2976,18 +3079,19 @@
                       "limiter": {
                         "type": "object",
                         "title": "Limiter",
+                        "description": "Ranges are the mixer's: threshold -12 to 0 dB, ceiling -3 to 0 dB.",
                         "properties": {
                           "thresholdDb": {
                             "type": "number",
                             "title": "Threshold (dB)",
-                            "minimum": -24,
+                            "minimum": -12,
                             "maximum": 0,
                             "default": -3
                           },
                           "ceilingDb": {
                             "type": "number",
                             "title": "Ceiling (dB)",
-                            "minimum": -12,
+                            "minimum": -3,
                             "maximum": 0,
                             "default": -1
                           }
@@ -3140,6 +3244,8 @@
                       },
                       "webhookUrl": {
                         "type": "string",
+                        "pattern": "^$|^https?://[^\\s]+$",
+                        "x-patternMessage": "must be an http:// or https:// URL",
                         "title": "Event webhook URL"
                       },
                       "defaultRule": {
@@ -3150,7 +3256,7 @@
                           "drop"
                         ],
                         "default": "pass",
-                        "description": "Signal conditioning default action. Rewrite is a per-rule action, not a default."
+                        "description": "Signal conditioning default action. Drop applies to every cue no rule matches, including operators' own cues: with drop and no rules, no cue is ever sent. Rewrite is a per-rule action, not a default."
                       }
                     }
                   }
@@ -3170,7 +3276,8 @@
                         "title": "Buffer per source (s)",
                         "minimum": 1,
                         "maximum": 300,
-                        "default": 300
+                        "default": 300,
+                        "description": "Switchframe keeps at most 200 MiB per source, so 300 s holds only up to about 5.6 Mbit/s per source; above that the window is shorter than asked."
                       },
                       "shutterAngle": {
                         "type": "integer",
@@ -3401,10 +3508,20 @@
                           "listener"
                         ],
                         "default": "caller",
-                        "description": "Caller: we push to the destination. Listener: the destination pulls from us."
+                        "description": "Caller: we push to the destination. Listener: the destination pulls from us.",
+                        "x-enumNeeds": {
+                          "caller": [
+                            "srt-caller-out"
+                          ],
+                          "listener": [
+                            "srt-listener-out"
+                          ]
+                        }
                       },
                       "address": {
                         "type": "string",
+                        "pattern": "^(\\[[0-9A-Fa-f:.]+\\]|[^\\s:/\\[\\]]+)$",
+                        "x-patternMessage": "must be a host name or address, without the port",
                         "title": "Destination host",
                         "x-when": {
                           "mode": [
@@ -3497,6 +3614,8 @@
                     "properties": {
                       "url": {
                         "type": "string",
+                        "pattern": "^rtmps?://[^\\s]+$",
+                        "x-patternMessage": "must start with rtmp:// or rtmps://",
                         "title": "Ingest URL",
                         "description": "rtmp:// or rtmps:// URL of the ingest."
                       },
@@ -3535,6 +3654,8 @@
                       },
                       "filenamePrefix": {
                         "type": "string",
+                        "pattern": "^(?!.*\\.\\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                        "x-patternMessage": "must be a plain file name prefix: a letter or digit, then up to 63 letters, digits, _ . or -, without ..",
                         "title": "File name prefix",
                         "default": "program"
                       },
@@ -3543,6 +3664,7 @@
                         "title": "Storage (GiB)",
                         "description": "Space to set aside for recordings.",
                         "minimum": 1,
+                        "x-facilityLimit": "maxRecordingGiB",
                         "default": 50,
                         "x-audience": "orchestrator"
                       }
@@ -3574,8 +3696,40 @@
             "cpu": 2,
             "memoryMiB": 4096
           },
+          "notes": {
+            "resources": "The default of 2 CPUs covers an all-features 1080p design."
+          },
           "discovery": {
             "register": true
+          }
+        },
+        "setupSchema": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "extraArgs": {
+                "type": "array",
+                "description": "Appended to the product's arguments, unchecked. Demo mode is refused: it replaces the workload's sources.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(?!--?demo(-video)?(=[\\s\\S]*)?$)",
+                  "x-patternMessage": "is refused: demo mode replaces the workload's sources"
+                }
+              }
+            }
+          },
+          "resources": {
+            "type": "object",
+            "properties": {
+              "cpu": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "memoryMiB": {
+                "type": "number",
+                "minimum": 512
+              }
+            }
           }
         }
       }

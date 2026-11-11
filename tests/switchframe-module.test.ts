@@ -21,17 +21,17 @@ function withMixer(sel: Parameters<typeof withSelection>[2], edit: (p: Groups) =
 }
 const mine = (doc: WorkloadDescription, text: string) => publishProblems(doc, catalog).filter((p) => p.includes(text))
 
-describe('SRT caller address is host:port', () => {
+describe('SRT caller address is host:port (the compiler\'s HOST_PORT)', () => {
   const caller = (address: string) =>
     withMixer({ inputs: { 'mxl-src': 3, 'srt-src': 1 } }, (p) => {
       Object.assign(p['srt-src'].srt, { mode: 'caller', address, streamId: 'cam9' })
       Object.assign(p['srt-src'].payload, { pathA: { bitrateMbps: 20 } })
     })
-  for (const ok of ['venue.example.net:9000', '10.0.0.7:7001', 'cam-9:1'])
+  for (const ok of ['venue.example.net:9000', '10.0.0.7:7001', 'cam-9:1', '[2001:db8::7]:9000'])
     test(`accepts ${ok}`, () => assert.deepEqual(mine(caller(ok), 'srt-src.srt.address'), []))
   for (const bad of ['venue.example.net', 'srt://venue:9000', 'venue:', ':9000', 'venue:123456', 'ven ue:9000'])
     test(`refuses ${JSON.stringify(bad)}`, () =>
-      assert.deepEqual(mine(caller(bad), 'srt-src.srt.address'), ['vision-mixer: srt-src.srt.address: must match ^[A-Za-z0-9.-]+:[0-9]{1,5}$']))
+      assert.deepEqual(mine(caller(bad), 'srt-src.srt.address'), ['vision-mixer: srt-src.srt.address: must be host:port']))
 })
 
 describe('SCTE-35 default rule is pass or drop', () => {

@@ -10,13 +10,21 @@ import { API_VERSION, type JsonValue, type ModuleBlock, type ModuleCatalog, type
 
 const block = (id: string, feature: string, extra: Partial<ModuleBlock> = {}): ModuleBlock => ({ id, feature, addons: [], ...extra })
 
+// The MXL flows Switchframe reads and writes: V210 / float32 stereo at 48 kHz, in the programme format
+// (frame size and rate of the engine, progressive BT.709 SDR). Its MXL sources are read from the
+// facility's test sources: the orchestrator's compiler only connects those (switchframe.py, rule 5 and 8).
+const SWITCHER_FLOWS: ModuleBlock['flowFormat'] = {
+  video: { mediaType: ['video/v210'], frameSize: 'function', grainRate: 'function', interlace: ['progressive'], colorspace: ['BT709'], transfer: ['SDR'] },
+  audio: { mediaType: ['audio/float32'], sampleRate: ['48000'], channelCount: [2] },
+}
+
 // Switchframe: open-source browser-based live production switcher (github.com/zsiec/switchframe,
 // fork github.com/thiagopnts/switchframe). Features from its README, docs/reference/config-and-flags.md
 // and docs/subsystems/*; how its settings map to the product's flags: docs/products/switchframe.md.
 const inputs = [
   block('srt-src', 'switcher.input.srt', { scaleOut: 16 }),
   block('moq-src', 'switcher.input.moq', { scaleOut: 8 }),
-  block('mxl-src', 'switcher.input.mxl', { scaleOut: 8 }),
+  block('mxl-src', 'switcher.input.mxl', { scaleOut: 8, readsFrom: ['dmf-mxl.*'], flowFormat: SWITCHER_FLOWS }),
   block('st2110-src', 'switcher.input.st2110', { scaleOut: 8 }),
 ]
 const features = [
@@ -40,7 +48,7 @@ const features = [
 const outputs = [
   block('srt-out', 'switcher.output.srt', { scaleOut: 8 }),
   block('rtmp-out', 'switcher.output.rtmp', { scaleOut: 4 }),
-  block('mxl-out', 'switcher.output.mxl', { noData: true }), // the product opens no data writer for the programme
+  block('mxl-out', 'switcher.output.mxl', { noData: true, flowFormat: SWITCHER_FLOWS }), // the product opens no data writer for the programme
   block('st2110-out', 'switcher.output.st2110'),
   block('recording', 'switcher.output.recording', { optional: { default: false } }),
 ]
@@ -65,8 +73,26 @@ const switchframe: VendorModule = withDerived({
     outputs: { 'mxl-out': 1 },
     control: { health: { type: 'http', port: 9090, path: '/health' } },
     resources: { cpu: 2, memoryMiB: 4096 },
+    notes: { resources: 'The default of 2 CPUs covers an all-features 1080p design.' },
     // The facility's flow agent registers every flow; the product doesn't register itself (no control.nmos).
     discovery: { register: true },
+  },
+  // What the product accepts in an instance's setup (switchframe.py: resources, settings_args).
+  setupSchema: {
+    settings: {
+      type: 'object',
+      properties: {
+        extraArgs: {
+          type: 'array',
+          description: 'Appended to the product\'s arguments, unchecked. Demo mode is refused: it replaces the workload\'s sources.',
+          items: { type: 'string', pattern: '^(?!--?demo(-video)?(=[\\s\\S]*)?$)', 'x-patternMessage': "is refused: demo mode replaces the workload's sources" },
+        },
+      },
+    },
+    resources: {
+      type: 'object',
+      properties: { cpu: { type: 'number', exclusiveMinimum: 0 }, memoryMiB: { type: 'number', minimum: 512 } },
+    },
   },
 })
 

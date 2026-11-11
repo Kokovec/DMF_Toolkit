@@ -17,7 +17,9 @@ import {
   requiresProblems,
   type InstanceSelection,
 } from './compose'
-import { LIBRARY } from './library'
+import { currentFacility, facilityProblems, productProblems, shapeProblems } from './facility'
+import { LIBRARY, matchesFeature } from './library'
+import { setupSchemaProblems, uniqueProblems } from './limits'
 import { defaultsFor, getPath, leafPaths, optionPaths, validateValue, withoutInapplicable } from './schema'
 import { uuidV5 } from './uuid'
 import { toWorkloadXml, XmlEncodeError } from './xml'
@@ -33,8 +35,10 @@ import {
   type Expectations,
   type ExternalKind,
   type ExternalReference,
+  type Facility,
   type FlowDef,
   type FlowField,
+  type FlowFormatField,
   type FlowFormat,
   type FlowOptions,
   type FeatureSelection,
@@ -483,8 +487,9 @@ export function checkWorkload(doc: unknown, cat: Catalog = currentCatalog()): st
   return errors
 }
 
-// Everything the orchestrator needs to be true before it can deploy the graph.
-export function publishProblems(doc: WorkloadDescription, cat: Catalog = currentCatalog()): string[] {
+// Everything the orchestrator needs to be true before it can deploy the graph, on this facility
+// (what it doesn't offer; nothing with no facility set) and within the products' limits.
+export function publishProblems(doc: WorkloadDescription, cat: Catalog = currentCatalog(), facility: Facility = currentFacility()): string[] {
   const errors = checkWorkload(doc, cat)
   if (errors.length) return errors
   if (!doc.spec.functions.length) return ['the workload has no functions']
@@ -498,6 +503,12 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
     // what's left on must still have what it needs (e.g. SCTE-104 with no MXL copy in use)
     errors.push(...requiresProblems(instanceDesign(prim, sel(f))).map((e) => `${f.id}: features: ${e}`))
     errors.push(...optionProblems(prim, f).map((e) => `${f.id}: ${e}`))
+    // what the facility doesn't offer (R8.8), and what the product can't do (e.g. RTMP with HEVC)
+    errors.push(...facilityProblems(prim, f, facility).map((e) => `${f.id}: ${e}`))
+    errors.push(...productProblems(prim, f).map((e) => `${f.id}: ${e}`))
+    // what the product accepts beyond each value (R8.9)
+    errors.push(...uniqueProblems(prim, f).map((e) => `${f.id}: ${e}`))
+    errors.push(...setupSchemaProblems(prim, f).map((e) => `${f.id}: ${e}`))
     errors.push(...validateValue(parts.schema, f.parameters).map((e) => `${f.id}: ${e}`))
     errors.push(...setupProblems(f).map((e) => `${f.id}: ${e}`))
     // '1' needs its wire (each path, when a port has two); '1..n' needs at least one array element wired.
@@ -511,6 +522,8 @@ export function publishProblems(doc: WorkloadDescription, cat: Catalog = current
     for (const other of [...(f.placement?.with ?? []), ...(f.placement?.apart ?? [])])
       if (!doc.spec.functions.some((g) => g.id === other)) errors.push(`${f.id}: placement refers to unknown function ${other}`)
   }
+  errors.push(...flowRuleProblems(doc, cat))
+  errors.push(...shapeProblems(doc, facility))
   errors.push(...accessProblems(doc.spec.access))
   errors.push(...historyProblems(doc))
   // What the XML can't carry (characters XML 1.0 lacks, unencodable keys, tokens not in normal form),
@@ -570,9 +583,10 @@ export function discoveryOf(prim: VendorModule | undefined, f: Pick<FunctionInst
 function optionProblems(prim: VendorModule, f: FunctionInstance): string[] {
   const parts = instanceParts(prim, sel(f))
   const copies = inputCopies(prim, sel(f)).map((c) => c.id)
-  return optionPaths(parts.schema).flatMap(({ path }) => {
+  return optionPaths(parts.schema).flatMap(({ path, emptyLabel }) => {
     const v = getPath(f.parameters, path)
-    return v === undefined || copies.includes(String(v)) ? [] : [`${path}: "${String(v)}" isn't an input in use (${copies.join(', ') || 'none'})`]
+    // with an empty meaning (e.g. "this source"), empty is allowed too
+    return v === undefined || (emptyLabel && v === '') || copies.includes(String(v)) ? [] : [`${path}: "${String(v)}" isn't an input copy in use (${copies.join(', ') || 'none'})`]
   })
 }
 
@@ -587,8 +601,9 @@ function withResolvedOptions(prim: VendorModule, f: FunctionInstance, parameters
   const first = inputCopies(prim, sel(f))[0]?.id
   if (!first) return parameters
   const out = structuredClone(parameters)
-  for (const { path } of optionPaths(instanceParts(prim, sel(f)).schema)) {
-    if (getPath(out, path) !== undefined) continue
+  for (const { path, emptyLabel } of optionPaths(instanceParts(prim, sel(f)).schema)) {
+    // unset means something of its own (e.g. this source), not the first copy
+    if (emptyLabel || getPath(out, path) !== undefined) continue
     const keys = path.split('.')
     let cur = out
     for (const k of keys.slice(0, -1)) {
@@ -636,7 +651,7 @@ export function parseRate(value: unknown): Rational | undefined {
 }
 
 // The writer's parameter values tagged with x-flow, e.g. { frameSize: "3840x2160", grainRate: "59.94" }.
-function flowValues(schema: JsonSchema, params: JsonValue): Partial<Record<FlowField, JsonValue>> {
+export function flowValues(schema: JsonSchema, params: JsonValue): Partial<Record<FlowField, JsonValue>> {
   const out: Partial<Record<FlowField, JsonValue>> = {}
   const walk = (node: JsonSchema, path: string) => {
     const field = node['x-flow']
@@ -715,6 +730,83 @@ export function flowsOf(doc: WorkloadDescription, cat: Catalog = currentCatalog(
     }
   }
   return flows
+}
+
+// A rate as people write it: 30000/1001 → "29.97", 25/1 → "25".
+function rateName(r: Rational | undefined): string {
+  if (!r) return 'missing'
+  if (r.den === 1) return String(r.num)
+  if (r.den === 1001) return String(Number((r.num / 1001).toFixed(3)))
+  return `${r.num}/${r.den}`
+}
+
+const FORMAT_NAMES: Record<FlowFormatField, string> = {
+  mediaType: 'media type',
+  frameSize: 'frame size',
+  grainRate: 'rate',
+  interlace: 'scan',
+  colorspace: 'colorspace',
+  transfer: 'transfer',
+  sampleRate: 'sample rate',
+  channelCount: 'channel count',
+}
+
+// MXL blocks with `readsFrom` / `flowFormat` (R8.9): the flows each copy reads or writes have a format
+// it accepts (a field "function" = the function's own x-flow value, e.g. a switcher's programme
+// format), and what it reads comes from a function of an allowed type. Named on the copy, as the
+// compiler does: "vision-mixer: mxl-src_2: flow cam2/mxl.video rate is 29.97, the function's is 25".
+export function flowRuleProblems(doc: WorkloadDescription, cat: Catalog = currentCatalog()): string[] {
+  const flows = new Map(flowsOf(doc, cat).map((f) => [f.writer, f]))
+  const types = new Map(doc.spec.functions.map((f) => [f.id, f.type]))
+  const errors: string[] = []
+  for (const f of doc.spec.functions) {
+    const prim = cat.get(f.type, f.typeVersion)
+    if (!prim) continue
+    const parts = instanceParts(prim, sel(f))
+    const own = flowValues(parts.schema, f.parameters)
+    for (const b of instanceDesign(prim, sel(f)).blocks) {
+      if (!b.flowFormat && !b.readsFrom) continue
+      for (const port of parts.ports.filter((p) => p.transport === 'mxl' && p.id.startsWith(`${b.id}.`))) {
+        const at = (msg: string) => errors.push(`${f.id}: ${msg}`)
+        let flow: FlowDef | undefined
+        if (port.direction === 'in') {
+          const wire = doc.spec.wires.find((w) => w.to === ref(f.id, port.id))
+          if (!wire) continue
+          flow = flows.get(wire.from)
+          const writer = splitRef(wire.from).node
+          if (b.readsFrom && port.essence === 'video' && !b.readsFrom.some((p) => matchesFeature(p, types.get(writer) ?? '')))
+            at(`${port.id}: is wired from ${writer} (${types.get(writer) ?? 'an external device'}), and ${b.id} reads only from ${b.readsFrom.join(', ')}`)
+        } else flow = flows.get(ref(f.id, port.id))
+        const rule = flow && b.flowFormat?.[flow.essence as 'video' | 'audio']
+        if (!flow || !rule) continue
+        const fmt = flow.format
+        const actual: Record<FlowFormatField, string | undefined> = {
+          mediaType: fmt.mediaType,
+          frameSize: fmt.frameWidth !== undefined ? `${fmt.frameWidth}x${fmt.frameHeight}` : undefined,
+          grainRate: fmt.grainRate && rateName(fmt.grainRate),
+          interlace: fmt.interlace,
+          colorspace: fmt.colorspace,
+          transfer: fmt.transfer,
+          sampleRate: fmt.sampleRate && rateName(fmt.sampleRate),
+          channelCount: fmt.channelCount?.toString(),
+        }
+        for (const [field, allowed] of Object.entries(rule) as [FlowFormatField, (string | number)[] | 'function'][]) {
+          const value = actual[field]
+          if (value === undefined && field === 'transfer') continue // not stated: SDR
+          if (allowed === 'function') {
+            const mine = own[field as FlowField]
+            if (mine === undefined) continue
+            const same = field === 'grainRate' ? rateName(parseRate(mine)) === value : String(mine) === value
+            if (!same) at(`${b.id}: flow ${flow.label} ${FORMAT_NAMES[field]} is ${value ?? 'missing'}, the function's is ${field === 'grainRate' ? rateName(parseRate(mine)) : String(mine)}`)
+          } else {
+            const ok = allowed.map((a) => (field === 'grainRate' || field === 'sampleRate' ? rateName(parseRate(a)) : String(a)))
+            if (value === undefined || !ok.includes(value)) at(`${b.id}: flow ${flow.label} ${FORMAT_NAMES[field]} is ${value ?? 'missing'}, must be ${ok.join(' or ')}`)
+          }
+        }
+      }
+    }
+  }
+  return errors
 }
 
 // The desired state handed to the orchestrator: no canvas layout, stamped with its revision,

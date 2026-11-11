@@ -345,6 +345,16 @@ button.danger {
 .status.offline {
   color: var(--muted);
 }
+.status.facility {
+  color: var(--accent);
+  cursor: help;
+}
+/* Something the facility doesn't offer (R8.8), or a product limit: why, next to it */
+.unavailable {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
 button:disabled {
   opacity: 0.5;
   cursor: default;

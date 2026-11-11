@@ -4,8 +4,10 @@
 // on has its own tab; Setup and Intent hold the instance's deployment setup and the operator's expectations.
 import { useEffect, useMemo, useState } from 'react'
 import { addonKey, copyId, featuresOf, inputBlocks, inputCopies, inputsOf, inputSelectionProblems, outputBlocks, outputsOf, outputSelectionProblems } from '../model/compose'
+import { useFacility } from '../api'
+import { conflictsOf, featureNeeds, unavailable } from '../model/facility'
 import { getFeature } from '../model/library'
-import type { Expectations, FeatureSelection, JsonSchema, JsonValue, ModuleBlock, PlacementConstraints, VendorModule } from '../model/types'
+import type { Expectations, Facility, FeatureSelection, JsonSchema, JsonValue, ModuleBlock, PlacementConstraints, VendorModule } from '../model/types'
 import { discoveryOf, schemaOf, withSelection, type FnData } from '../model/workload'
 import { FunctionSetup } from './FunctionSetup'
 import { SchemaForm, type SchemaChoices } from './SchemaForm'
@@ -35,6 +37,9 @@ const AUDIENCE: Record<string, string> = {
 export function FunctionDialog({ id, data, prim, others, problems, onChange, onClose }: Props) {
   const schema = schemaOf(prim, data)
   const params = data.parameters
+  const facility = useFacility()
+  // Why a block isn't offered on this facility (null: it is, or no facility is set).
+  const whyNot = (b: ModuleBlock) => unavailable(featureNeeds(getFeature(b.feature)), facility)
   const update = (patch: Partial<FnData>) => onChange({ ...data, ...patch })
   const setGroup = (group: string, v: Obj) => update({ parameters: { ...params, [group]: v } })
   // Fields whose choices come from the instance, e.g. which input is on air at start.
@@ -111,7 +116,7 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
           {current.kind === 'general' && (
             <>
               <General id={id} data={data} update={update} />
-              <Features prim={prim} data={data} onChange={(features) => onChange(withSelection(data, prim, { features }))} />
+              <Features prim={prim} data={data} facility={facility} onChange={(features) => onChange(withSelection(data, prim, { features }))} />
             </>
           )}
           {current.kind === 'inputs' && (
@@ -122,6 +127,9 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
               rule={prim.design.inputRule ?? 'several'}
               problems={inputSelectionProblems(prim, data.inputs)}
               onCounts={(inputs) => onChange(withSelection(data, prim, { inputs }))}
+              whyNot={whyNot}
+              choices={choices}
+              conflicts={() => []}
               schema={schema}
               params={params}
               onGroup={setGroup}
@@ -134,6 +142,9 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
               counts={outputsOf(prim, data.outputs)}
               problems={outputSelectionProblems(prim, data.outputs)}
               onCounts={(outputs) => onChange(withSelection(data, prim, { outputs }))}
+              whyNot={whyNot}
+              choices={choices}
+              conflicts={(copy) => conflictsOf(prim, data, copy)}
               schema={schema}
               params={params}
               onGroup={setGroup}
@@ -142,7 +153,7 @@ export function FunctionDialog({ id, data, prim, others, problems, onChange, onC
           {current.kind === 'block' && (
             <GroupTabs key={current.group} schema={schema.properties![current.group]} value={(params[current.group] as Obj) ?? {}} root={params} choices={choices} onChange={(v) => setGroup(current.group, v)} />
           )}
-          {current.kind === 'setup' && <FunctionSetup key={id} data={data} vendor={prim.vendor} update={update} />}
+          {current.kind === 'setup' && <FunctionSetup key={id} data={data} vendor={prim.vendor} notes={prim.defaults?.notes} update={update} />}
           {current.kind === 'intent' && <Intent data={data} prim={prim} others={others} update={update} />}
         </div>
         {mine.length > 0 && (
@@ -185,7 +196,8 @@ function General({ id, data, update }: { id: string; data: FnData; update: (p: P
 
 // ---- Optional functions: on or off. An add-on is offered only while its function is on. ----
 
-function Features({ prim, data, onChange }: { prim: VendorModule; data: FnData; onChange: (features: FeatureSelection) => void }) {
+// What the facility doesn't offer can't be turned on (and says why); if it's already on, it can be turned off.
+function Features({ prim, data, facility, onChange }: { prim: VendorModule; data: FnData; facility: Facility; onChange: (features: FeatureSelection) => void }) {
   const blocks = prim.design.blocks.filter((b) => b.optional)
   if (!blocks.length) return null
   const on = featuresOf(prim, data.features)
@@ -197,25 +209,29 @@ function Features({ prim, data, onChange }: { prim: VendorModule; data: FnData; 
       <p className="hint">What this instance runs. A feature that's off has no tab and isn't published.</p>
       {blocks.map((b) => (
         <div key={b.id}>
-          <label className="field field-check" title={getFeature(b.feature)?.description}>
-            <input type="checkbox" checked={on[b.id]} onChange={(e) => set(b.id, e.target.checked)} />
-            <span>{name(b.feature)}</span>
-          </label>
+          <Toggle label={name(b.feature)} title={getFeature(b.feature)?.description} on={on[b.id]} why={unavailable(featureNeeds(getFeature(b.feature)), facility)} onChange={(v) => set(b.id, v)} />
           {on[b.id] &&
             b.addons
               .filter((a) => addonKey(a) in (b.optional?.addons ?? {}))
               .map((a) => {
                 const key = `${b.id}.${addonKey(a)}`
-                return (
-                  <label key={key} className="field field-check feature-addon" title={getFeature(a)?.description}>
-                    <input type="checkbox" checked={on[key]} onChange={(e) => set(key, e.target.checked)} />
-                    <span>{name(a)}</span>
-                  </label>
-                )
+                return <Toggle key={key} addon label={name(a)} title={getFeature(a)?.description} on={on[key]} why={unavailable(getFeature(a)?.needs, facility)} onChange={(v) => set(key, v)} />
               })}
         </div>
       ))}
     </div>
+  )
+}
+
+function Toggle({ label, title, on, why, addon, onChange }: { label: string; title?: string; on: boolean; why: string | null; addon?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <>
+      <label className={`field field-check${addon ? ' feature-addon' : ''}`} title={title}>
+        <input type="checkbox" checked={on} disabled={!!why && !on} onChange={(e) => onChange(e.target.checked)} />
+        <span>{label}</span>
+      </label>
+      {why && <p className={`${on ? 'error-text' : 'unavailable'}${addon ? ' feature-addon' : ''}`}>{on ? `On, but it ${why}: turn it off to publish` : `Not offered: it ${why}`}</p>}
+    </>
   )
 }
 
@@ -265,9 +281,12 @@ type CopiesProps = {
   schema: JsonSchema
   params: Obj
   onGroup: (group: string, v: Obj) => void
+  whyNot: (b: ModuleBlock) => string | null // not offered on this facility
+  conflicts: (copy: string) => string[] // product limits in force for a copy
+  choices: SchemaChoices // fields whose choices come from the instance (e.g. a key's fill source)
 }
 
-function Copies({ which, blocks, counts, rule, problems, onCounts, schema, params, onGroup }: CopiesProps) {
+function Copies({ which, blocks, counts, rule, problems, onCounts, schema, params, onGroup, whyNot, conflicts, choices }: CopiesProps) {
   const one = which === 'inputs' && rule === 'one'
   // every copy that has settings, e.g. "SRT source 1", "SRT source 2"
   const copies = blocks.flatMap((b) =>
@@ -296,21 +315,33 @@ function Copies({ which, blocks, counts, rule, problems, onCounts, schema, param
           {blocks.map((b) => {
             const n = counts[b.id] ?? 0
             const max = b.scaleOut ?? 1
+            // not offered here: can't be added, but copies already in use can be removed
+            const why = whyNot(b)
+            const limits = [...new Set(Array.from({ length: n }, (_, i) => conflicts(copyId(b.id, i + 1))).flat())]
             return (
               <tr key={b.id}>
-                <td title={getFeature(b.feature)?.description}>{getFeature(b.feature)?.name ?? b.id}</td>
+                <td title={getFeature(b.feature)?.description}>
+                  {getFeature(b.feature)?.name ?? b.id}
+                  {why && <div className={n > 0 ? 'error-text' : 'unavailable'}>{n > 0 ? `In use, but it ${why}` : `Not offered: it ${why}`}</div>}
+                  {limits.map((l) => (
+                    <div key={l} className="error-text">
+                      {l}
+                    </div>
+                  ))}
+                </td>
                 <td>
                   <input
                     type={one ? 'radio' : 'checkbox'}
                     name={`${which}-used`}
                     checked={n > 0}
+                    disabled={!!why && n === 0}
                     onChange={(e) => (one ? pick(b.id) : set(b.id, e.target.checked ? Math.max(1, n) : 0))}
                   />
                 </td>
                 <td>
                   {max > 1 ? (
                     <>
-                      <input type="number" min={0} max={max} value={n} onChange={(e) => set(b.id, Math.min(max, Math.max(one ? 1 : 0, Math.floor(e.target.valueAsNumber) || 0)))} />{' '}
+                      <input type="number" min={0} max={why ? n : max} disabled={!!why && n === 0} value={n} onChange={(e) => set(b.id, Math.min(why ? n : max, Math.max(one ? 1 : 0, Math.floor(e.target.valueAsNumber) || 0)))} />{' '}
                       <span className="hint">of {max}</span>
                     </>
                   ) : (
@@ -341,7 +372,7 @@ function Copies({ which, blocks, counts, rule, problems, onCounts, schema, param
             ))}
           </nav>
           <div className="copy-form">
-            <GroupTabs key={current.id} schema={schema.properties![current.id]} value={(params[current.id] as Obj) ?? {}} root={params} onChange={(v) => onGroup(current.id, v)} />
+            <GroupTabs key={current.id} schema={schema.properties![current.id]} value={(params[current.id] as Obj) ?? {}} root={params} choices={choices} onChange={(v) => onGroup(current.id, v)} />
           </div>
         </div>
       )}

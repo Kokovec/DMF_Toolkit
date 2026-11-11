@@ -98,12 +98,20 @@ export function validateValue(schema: JsonSchema, value: JsonValue | undefined, 
       if (combination) errors.push(`${at}: ${combination}`)
       return errors
     }
-    case 'array':
+    case 'array': {
       if (!Array.isArray(value)) return [`${at}: must be an array`]
-      return schema.items ? value.flatMap((v, i) => validateValue(schema.items!, v, `${at}[${i}]`, root)) : []
+      const items = schema.items
+      if (!items) return []
+      // Plain values in a list are reported at the list, naming the value ("extraArgs: "--demo" is refused…").
+      if (items.type !== 'object' && items.type !== 'array')
+        return value.flatMap((v) => validateValue(items, v, 'item', root).map((e) => `${at}: ${JSON.stringify(v)} ${e.slice('item: '.length)}`))
+      return value.flatMap((v, i) => validateValue(items, v, `${at}[${i}]`, root))
+    }
     case 'string':
       if (typeof value !== 'string') return [`${at}: must be text`]
-      return schema.pattern && !new RegExp(schema.pattern).test(value) ? [`${at}: must match ${schema.pattern}`] : []
+      if (schema['x-maxBytes'] !== undefined && new TextEncoder().encode(value).length > schema['x-maxBytes'])
+        return [`${at}: must be at most ${schema['x-maxBytes']} bytes as UTF-8 (this is ${new TextEncoder().encode(value).length})`]
+      return schema.pattern && !new RegExp(schema.pattern).test(value) ? [`${at}: ${schema['x-patternMessage'] ?? `must match ${schema.pattern}`}`] : []
     case 'boolean':
       return typeof value === 'boolean' ? [] : [`${at}: must be true or false`]
     case 'number':
@@ -111,6 +119,7 @@ export function validateValue(schema: JsonSchema, value: JsonValue | undefined, 
       if (typeof value !== 'number' || Number.isNaN(value)) return [`${at}: must be a number`]
       if (schema.type === 'integer' && !Number.isInteger(value)) return [`${at}: must be a whole number`]
       if (schema.minimum !== undefined && value < schema.minimum) return [`${at}: must be ≥ ${schema.minimum}`]
+      if (schema.exclusiveMinimum !== undefined && value <= schema.exclusiveMinimum) return [`${at}: must be more than ${schema.exclusiveMinimum}`]
       if (schema.maximum !== undefined && value > schema.maximum) return [`${at}: must be ≤ ${schema.maximum}`]
       return []
     }
@@ -134,6 +143,10 @@ export function checkParameterSchema(schema: unknown): string[] {
         errors.push(`${path}: invalid pattern ${node.pattern}`)
       }
     if (node['x-options'] !== undefined && node['x-options'] !== 'inputs') errors.push(`${path}: unknown x-options "${String(node['x-options'])}"`)
+    if (node['x-emptyLabel'] !== undefined && !node['x-options']) errors.push(`${path}: x-emptyLabel needs x-options`)
+    if (node['x-maxBytes'] !== undefined && !(Number.isInteger(node['x-maxBytes']) && node['x-maxBytes'] > 0)) errors.push(`${path}: x-maxBytes must be a whole number above 0`)
+    if (node['x-facilityLimit'] !== undefined && (typeof node['x-facilityLimit'] !== 'string' || !['number', 'integer'].includes(node.type ?? '')))
+      errors.push(`${path}: x-facilityLimit names a limit, on a number`)
     const allowed = node['x-allowed']
     if (allowed) {
       if (allowed.fields?.length !== 2 || allowed.fields.some((f) => !node.properties?.[f])) errors.push(`${path}: x-allowed needs two fields of this group`)
@@ -153,10 +166,18 @@ export function checkParameterSchema(schema: unknown): string[] {
 }
 
 // Dot paths of the fields whose choices come from the instance (`x-options`).
-export function optionPaths(schema: JsonSchema, prefix = ''): { path: string; source: 'inputs' }[] {
+export function optionPaths(schema: JsonSchema, prefix = ''): { path: string; source: 'inputs'; emptyLabel?: string }[] {
   return Object.entries(schema.properties ?? {}).flatMap(([k, s]) => {
     const path = prefix ? `${prefix}.${k}` : k
-    return s['x-options'] ? [{ path, source: s['x-options'] }] : optionPaths(s, path)
+    return s['x-options'] ? [{ path, source: s['x-options'], ...(s['x-emptyLabel'] ? { emptyLabel: s['x-emptyLabel'] } : {}) }] : optionPaths(s, path)
+  })
+}
+
+// Dot paths of the fields with a given keyword, with their schema (e.g. every `x-unique` field).
+export function pathsWith(schema: JsonSchema, keyword: keyof JsonSchema, prefix = ''): { path: string; schema: JsonSchema }[] {
+  return Object.entries(schema.properties ?? {}).flatMap(([k, s]) => {
+    const path = prefix ? `${prefix}.${k}` : k
+    return [...(s[keyword] !== undefined ? [{ path, schema: s }] : []), ...pathsWith(s, keyword, path)]
   })
 }
 

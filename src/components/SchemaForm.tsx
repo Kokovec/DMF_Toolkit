@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useFacility } from '../api'
+import { facilityLimitProblem, valueUnavailable } from '../model/facility'
 import { allowedChoices, allowedProblem, applies, isSecretRef, SECRET_FORMAT, titleFor, validateValue } from '../model/schema'
 import type { JsonSchema, JsonValue } from '../model/types'
 
@@ -72,6 +74,7 @@ type FieldProps = {
 }
 
 function SchemaField({ name, schema, required, value, siblings, root, choices, onChange }: FieldProps) {
+  const facility = useFacility()
   const label = (
     <span>
       {titleFor(schema, siblings, root) ?? name}
@@ -80,6 +83,8 @@ function SchemaField({ name, schema, required, value, siblings, root, choices, o
     </span>
   )
   const errors = required && value === undefined && schema.type !== 'object' ? [`${name}: required`] : validateValue(schema, value, name, root)
+  const overLimit = facilityLimitProblem(schema, value, facility)
+  if (overLimit) errors.push(`${name}: ${overLimit}`)
   const hint = errors.length ? <span className="error-text">{errors[0].replace(`${name}: `, '')}</span> : schema.description && <span className="hint">{schema.description}</span>
 
   if (schema.format === SECRET_FORMAT)
@@ -101,7 +106,7 @@ function SchemaField({ name, schema, required, value, siblings, root, choices, o
       <label className="field">
         {label}
         <select value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value || undefined)}>
-          <option value="">{options[0] ? `First (${options[0].label})` : '—'}</option>
+          <option value="">{schema['x-emptyLabel'] ?? (options[0] ? `First (${options[0].label})` : '—')}</option>
           {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -109,11 +114,16 @@ function SchemaField({ name, schema, required, value, siblings, root, choices, o
           ))}
           {typeof value === 'string' && value && !known && <option value={value}>{value} (not in use)</option>}
         </select>
-        {typeof value === 'string' && value && !known ? <span className="error-text">{value} isn't an input in use</span> : hint}
+        {typeof value === 'string' && value && !known ? <span className="error-text">{value} isn't an input copy in use</span> : hint}
       </label>
     )
   }
-  if (schema.enum)
+  if (schema.enum) {
+    // Values the facility doesn't offer (x-enumNeeds) can't be chosen; the current one stays shown.
+    const why = (o: string | number) => valueUnavailable(schema, o, facility)
+    const current = value === undefined ? (schema.default as string | number | undefined) : (value as string | number)
+    const currentWhy = current !== undefined ? why(current) : null
+    const others = schema.enum.filter((o) => o !== current && why(o))
     return (
       <label className="field">
         {label}
@@ -126,14 +136,19 @@ function SchemaField({ name, schema, required, value, siblings, root, choices, o
         >
           {!required && <option value="">—</option>}
           {schema.enum.map((o) => (
-            <option key={String(o)} value={String(o)}>
+            <option key={String(o)} value={String(o)} disabled={o !== value && !!why(o)}>
               {String(o)}
+              {why(o) ? ' (not offered)' : ''}
             </option>
           ))}
         </select>
-        {hint}
+        {currentWhy ? <span className="error-text">{`${String(current)} ${currentWhy}`}</span> : hint}
+        {others.map((o) => (
+          <span key={String(o)} className="unavailable">{`Not offered: ${String(o)} ${why(o)}`}</span>
+        ))}
       </label>
     )
+  }
   switch (schema.type) {
     case 'boolean':
       return (

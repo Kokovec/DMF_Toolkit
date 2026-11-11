@@ -83,16 +83,17 @@ are resolved by the orchestrator.
 | `<source>.audio.delayMs` | `PUT /api/audio/{source}/audio-delay` | 0–500 ms |
 | `<source>.audio.highPass` | `PUT /api/audio/{source}/hpf` `{frequency, enabled}` | 20–500 Hz |
 | `<source>.audio.gate` | `PUT /api/audio/{source}/gate` `{threshold, range, attack, release, hold, enabled}` | |
-| `<source>.audio.eq.low/mid/high` | `PUT /api/audio/{source}/eq` `{band: 0/1/2, frequency, gain, q, enabled}` | One call per band |
+| `<source>.audio.eq.low/mid/high` | `PUT /api/audio/{source}/eq` `{band: 0/1/2, frequency, gain, q, enabled}` | One call per band. Ranges are the mixer's (`server/audio/eq.go`), narrower than the API's: low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4 |
 | `<source>.audio.compressor` | `PUT /api/audio/{source}/compressor` `{threshold, ratio, attack, release, makeupGain}` | Ratio 1 = off |
-| `<source>.key.type` chroma, luma | `PUT /api/sources/{source}/key` (`graphics.KeyConfig`); `off` → `DELETE` | `neural` needs a CUDA build |
+| `<source>.key.type` chroma, luma | `PUT /api/sources/{source}/key` (`graphics.KeyConfig`); `off` → `DELETE` | An enabled key is over programme all the time. `neural` needs a CUDA build (capability `neural-key`) |
+| `<source>.key.fillSource` | `fillSource` in the key body: the fill source's key | An input copy id of the same function (e.g. `mxl-src_2`); unset = this source |
 | `encoder.encoder.bitrateMbps` | `--output-bitrate` (bit/s) | 0 = auto |
 | `encoder.encoder.gopSeconds` / `preset` / `timecode` | `--output-gop-secs` / `--output-preset` / `--output-timecode` | |
 | `srt-out.srt.*`, mode caller | `POST /api/output/destinations` type `srt-caller`, then `…/{id}/start` | Not persisted by the product: recreated, matched by `name` = block id. `maxBandwidth` in bytes/s. `passphrase` is a secret. Mode listener isn't available: no output ports |
-| `rtmp-out.rtmp.url` / `streamKey` | Destination type `rtmp`, `url` / `streamID` | Stream key is a secret |
+| `rtmp-out.rtmp.url` / `streamKey` | Destination type `rtmp`, `url` / `streamID` | Stream key is a secret. Refused with colour profile `standard-hevc` or `professional` (a product limit): the HEVC → H.264 transcoder isn't wired up at the pinned commit, so it would report active and send nothing |
 | `recording` on; `recording.recording.*` | `POST /api/recording/start` `{outputDir: "/recordings", rotateAfterMins, maxFileSizeMB, filenamePrefix}` | Restarted when stopped unexpectedly. `rotateAfterMinutes` is at least 1: the product treats 0 as 60 |
 | `recording.recording.storageGiB` | Size of the recordings volume | Orchestrator only; required when on, default 50 |
-| `audio.master.limiter` | `PUT /api/audio/limiter` `{threshold, ceiling}` | |
+| `audio.master.limiter` | `PUT /api/audio/limiter` `{threshold, ceiling}` | Ranges are the mixer's: threshold -12 to 0 dB, ceiling -3 to 0 dB |
 | `replay` on/off; `replay.replay.bufferSeconds` | `--replay-buffer-secs` (0 when off) | |
 | `replay.replay.shutterAngle` | `PUT /api/replay/shutter-angle` `{angle}` | |
 | `clips.clips.storageMaxGB` / `ephemeralTtlHours` | `--clip-storage-max` (bytes) / `--clip-ephemeral-ttl` | |

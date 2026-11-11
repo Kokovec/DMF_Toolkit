@@ -2,6 +2,8 @@
 // (free-form JSON, passed through unchanged), control & health endpoints, dependencies and the
 // resource profile. Modules only define identity and design.
 import { useRef, useState } from 'react'
+import { useFacility } from '../api'
+import { unavailable } from '../model/facility'
 import { LIBRARY } from '../model/library'
 import {
   DEPENDENCY_KINDS,
@@ -12,19 +14,20 @@ import {
   type HealthType,
   type JsonValue,
   type ResourceProfile,
+  type VendorModule,
 } from '../model/types'
 import type { FnData } from '../model/workload'
 
-type Props = { data: FnData; vendor: string; update: (patch: Partial<FnData>) => void }
+type Props = { data: FnData; vendor: string; notes?: NonNullable<VendorModule['defaults']>['notes']; update: (patch: Partial<FnData>) => void }
 type Obj = { [k: string]: JsonValue }
 
-export function FunctionSetup({ data, vendor, update }: Props) {
+export function FunctionSetup({ data, vendor, notes, update }: Props) {
   return (
     <>
       <VendorSettings key={data.type} value={data.settings ?? {}} vendor={vendor} onChange={(settings) => update({ settings })} />
       <Control value={data.control ?? {}} onChange={(control) => update({ control: clean(control) })} />
       <Dependencies rows={data.dependencies ?? []} onChange={(dependencies) => update({ dependencies: dependencies.length ? dependencies : undefined })} />
-      <Resources value={data.resources ?? {}} onChange={(r) => update({ resources: Object.keys(r).length ? r : undefined })} />
+      <Resources value={data.resources ?? {}} note={notes?.resources} onChange={(r) => update({ resources: Object.keys(r).length ? r : undefined })} />
     </>
   )
 }
@@ -222,12 +225,15 @@ const RESOURCE_FIELDS = [
   ['storageGiB', 'Storage (GiB)'],
 ] as const
 
-function Resources({ value: r, onChange }: { value: ResourceProfile; onChange: (r: ResourceProfile) => void }) {
+function Resources({ value: r, note, onChange }: { value: ResourceProfile; note?: string; onChange: (r: ResourceProfile) => void }) {
   const set = (patch: Partial<ResourceProfile>) => onChange(clean({ ...r, ...patch }))
+  // A GPU is offered only if the facility has the capability (or no facility is set).
+  const noGpu = unavailable(['gpu'], useFacility())
   return (
     <>
       <h3>Resource profile</h3>
       <p className="hint">What this function needs (a requirement for the orchestrator's sizing, not an allocation). Leave empty if unknown.</p>
+      {note && <p className="hint">{note}</p>}
       <div className="field-row">
         {RESOURCE_FIELDS.map(([k, label]) => (
           <label key={k} className="field">
@@ -239,9 +245,11 @@ function Resources({ value: r, onChange }: { value: ResourceProfile; onChange: (
           <span>GPU class</span>
           <input
             value={r.gpu?.class ?? ''}
+            disabled={!!noGpu && !r.gpu}
             placeholder="none, or e.g. nvidia-l4"
             onChange={(e) => set({ gpu: e.target.value ? { class: e.target.value, count: r.gpu?.count ?? 1 } : undefined })}
           />
+          {noGpu && <span className={r.gpu ? 'error-text' : 'unavailable'}>{r.gpu ? `Set, but a GPU ${noGpu}: clear it to publish` : `Not offered: a GPU ${noGpu}`}</span>}
         </label>
         {r.gpu && (
           <label className="field">

@@ -7,6 +7,8 @@ import type { Essence, FeatureDef, FeatureSelection, InputSelection, JsonSchema,
 
 export const BLOCK_ID_RE = /^[a-z][a-z0-9-]*$/ // no dots: block ids prefix port and parameter paths
 
+const FORMAT_FIELDS = ['mediaType', 'frameSize', 'grainRate', 'interlace', 'colorspace', 'transfer', 'sampleRate', 'channelCount']
+
 export const EMPTY_DESIGN: ModuleDesign = { blocks: [], moduleFeatures: [] }
 
 const label = (b: ModuleBlock) => `${getFeature(b.feature)?.name ?? b.feature} (${b.id})`
@@ -382,6 +384,15 @@ export function designProblems(design: ModuleDesign): string[] {
         if (!b.addons.some((a) => addonKey(a) === key)) errors.push(`${label(b)}: optional add-on "${key}" isn't attached`)
     }
     if (b.noData && !f?.mxlInputs && !f?.mxlOutputs) errors.push(`${label(b)}: only MXL blocks can have noData`)
+    if (b.readsFrom !== undefined && (!f?.mxlInputs || !Array.isArray(b.readsFrom) || !b.readsFrom.length))
+      errors.push(`${label(b)}: readsFrom is a list of module types, on an MXL input`)
+    if (b.flowFormat !== undefined) {
+      if (!f?.mxlInputs && !f?.mxlOutputs) errors.push(`${label(b)}: only MXL blocks have a flowFormat`)
+      for (const [essence, rule] of Object.entries(b.flowFormat))
+        for (const [field, v] of Object.entries(rule ?? {}))
+          if (!['video', 'audio'].includes(essence) || !FORMAT_FIELDS.includes(field) || !(v === 'function' || (Array.isArray(v) && v.length)))
+            errors.push(`${label(b)}: flowFormat.${essence}.${field} must be "function" or a list of values`)
+    }
     for (const [path, allowed] of Object.entries(b.allowed ?? {})) {
       const group = groupAt(baseGroups(b), path)
       if (!group) errors.push(`${label(b)}: allowed: no parameter group "${path}"`)

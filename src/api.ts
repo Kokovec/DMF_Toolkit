@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { Catalog, currentCatalog, setCatalog, subscribeCatalog } from './model/catalog'
+import { currentFacility, setFacility, subscribeFacility } from './model/facility'
 import { vendorSlug } from './model/modules'
-import { API_VERSION, type ModuleCatalog, type VendorModule, type WorkloadDescription } from './model/types'
+import { API_VERSION, type Facility, type ModuleCatalog, type VendorModule, type WorkloadDescription } from './model/types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -46,6 +47,7 @@ export type CatalogImportResult = { added: string[]; updated: string[]; unchange
 const enc = encodeURIComponent
 
 export const api = {
+  facility: () => call<Facility>('GET', '/facility'),
   modules: () => call<{ modules: VendorModule[] }>('GET', '/modules').then((r) => r.modules),
   parts: () => call<{ parts: PartSummary[] }>('GET', '/parts').then((r) => r.parts),
   saveModule: (catalogId: string, module: VendorModule) =>
@@ -88,4 +90,13 @@ export async function refreshCatalog() {
 
 export function useCatalog(): Catalog {
   return useSyncExternalStore(subscribeCatalog, currentCatalog)
+}
+
+// What the facility can run (DMF_FACILITY on the server). {} = no facility: everything is offered.
+export async function refreshFacility() {
+  setFacility(await api.facility())
+}
+
+export function useFacility(): Facility {
+  return useSyncExternalStore(subscribeFacility, currentFacility)
 }

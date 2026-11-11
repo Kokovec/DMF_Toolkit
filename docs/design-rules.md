@@ -56,7 +56,8 @@ primitives still existed; the parameters now live on features). `media-primitive
   headings. *Enforced by:* `Catalog.byCompany` (`catalog.ts`), `Palette.tsx`; categories: `checkModule`.
 - **R3.8 Design rules live with the features in the library:** `attachTo` (where an add-on may
   go), `maxPerBlock`, `maxPerModule`, `needsAddon` (e.g. a decoder needs at least one codec).
-  A product module that breaks them is refused on import.
+  A product module that breaks them is refused on import. Per instance: `requires` (R3.14) and
+  `conflictsWith` (product limits, R8.8); facility needs are `needs` and `x-enumNeeds` (R8.8).
   *Enforced by:* `canAttach`, `designProblems` (`src/model/compose.ts`), `checkCatalog`.
 - **R3.9 Ports and core parameters are derived from the design, never edited.** Each block's
   parameters sit under its block id (`srt1.srt.latencyMs`); its ports are prefixed with it
@@ -104,7 +105,7 @@ primitives still existed; the parameters now live on features). `media-primitive
   - *Feature library* (`src/model/library.json`): categories, feature groups,
     features (parameters, ports, design rules) and the shared
     **vocabulary** (protocols with labels/aliases, MXL formats, External device kinds, reference
-    kinds, access roles). New features, protocols, formats or device kinds need a library change only, no code.
+    kinds, access roles, facility capabilities). New features, protocols, formats or device kinds need a library change only, no code.
     *Loaded by:* `src/model/library.ts`, `src/model/vocabulary.ts`.
   - *Database*: vendor catalogs and modules, workloads.
 - **R3.7 The feature library is a versioned file in git, not editable in the UI.** It's the
@@ -132,8 +133,9 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R4.4 Core parameters** are the features' common vocabulary: minimal, understood by the
   configurator (wiring, flow formats, vendor swaps).
 - **R4.5 Vendor settings are free-form JSON in the vendor's own names and structure** (typed in or
-  loaded from a file), passed through unchanged by the orchestrator. No schema and no core → vendor
-  mapping: the orchestrator gets core parameters and vendor settings side by side.
+  loaded from a file), passed through unchanged by the orchestrator. No core → vendor mapping: the
+  orchestrator gets core parameters and vendor settings side by side. A product may check the keys
+  its compile reads (`setupSchema.settings`, e.g. Switchframe's `extraArgs`); other keys pass unchecked (R8.9).
 - **R4.7 Resource profile = what the instance needs** (CPU, memory, GPU, network, storage): a
   requirement for the orchestrator's sizing, not an allocation.
 - **R4.6 New vendor features = a new module version.** Instances upgrade explicitly; the
@@ -166,7 +168,9 @@ primitives still existed; the parameters now live on features). `media-primitive
   is left, it becomes the default. *Enforced by:* `allowedProblem`, `validateValue`, `allowedChoices`
   (`schema.ts`); `blockSchema` (`compose.ts`); `SchemaForm`.
 - **R5.9 A field's choices can come from the instance** (`x-options: "inputs"`: its input copies in
-  use). It must name a copy in use; unset means the first, and is published explicitly.
+  use). It must name a copy in use; unset means the first, and is published explicitly, unless the
+  field says what empty means (`x-emptyLabel`, e.g. a key's fill source: "This source"): then empty is
+  allowed and stays unset.
   *Enforced by:* `optionPaths` (`schema.ts`), `optionProblems`, `withResolvedOptions` (`workload.ts`), `SchemaForm`.
 
 ## 6. Ports, wiring and flows
@@ -234,7 +238,13 @@ primitives still existed; the parameters now live on features). `media-primitive
   captions (+ AI speech-to-text), SCTE-35 (+ SCTE-104), replay, clip players, playout, control room,
   and the live-operated ones (transitions, audio mixer, keyers & DVE, graphics, colour grading,
   ST map, AI background removal, comms). Only real deploy-time settings are parameters;
-  live-operated features have none. Ports, TLS, state/cache paths, DPDK, GPU builds and
+  live-operated features have none. Ranges are the product's where it's narrower than its API
+  (from the mixer: EQ low 80–1000 Hz, mid 200–8000 Hz, high 1000–16000 Hz, gain ±12 dB, Q 0.5–4;
+  master limiter threshold -12 to 0 dB, ceiling -3 to 0 dB). Help texts say what a choice really
+  does: an enabled key is over programme all the time; a 300 s replay buffer holds only up to about
+  5.6 Mbit/s per source; the SCTE-35 default rule `drop` also drops operators' cues; the default of
+  2 CPUs covers an all-features 1080p design (`defaults.notes.resources`, shown in the Setup tab).
+  RTMP can't run with an HEVC colour profile (R8.8). Ports, TLS, state/cache paths, DPDK, GPU builds and
   active-active pairs are the orchestrator's. Mapping to the product: `products/switchframe.md`;
   example module: `catalogs/switchframe.catalog.json`.
   Per source (every switcher input): label, multiview position, alignment delay; audio channel
@@ -243,8 +253,9 @@ primitives still existed; the parameters now live on features). `media-primitive
   that are configuration (format, captions mode, speech-to-text, master limiter, SCTE-35 default
   rule, replay shutter angle, destinations, recording); run-time calls are excluded. Security
   settings (API and invite tokens, allowed origins) are the orchestrator's, not module settings.
-  An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`), and its caller
-  address is `host:port` (`^[A-Za-z0-9.-]+:[0-9]{1,5}$`); recording declares its storage
+  An SRT source's stream ID is required in both modes (`^[A-Za-z0-9_-]{1,64}$`, unique per function),
+  and its caller address is `host:port` (the compiler's `HOST_PORT`, IPv6 in brackets too); a key's
+  fill source is an input copy of the same function, empty meaning this source (R5.9); recording declares its storage
   (`storageGiB`, for the orchestrator) and rotates files at least every 1 minute (the product treats
   0 as 60); the SCTE-35 default rule is `pass` or `drop` (the product can't default to `rewrite`).
   Values follow the product's request bodies, checked against its source at the pinned commit. Captions are turned off with the feature toggle,
@@ -288,6 +299,61 @@ primitives still existed; the parameters now live on features). `media-primitive
   that doesn't match still opens, but can't be saved, imported or published until it's renamed; the
   problem names the id. *Enforced by:* `checkWorkload`, `nextNodeId`, `toInstanceId` (`workload.ts`),
   `PUT /api/workloads/:id` (`server/app.ts`), Workload panel (`Inspector.tsx`).
+- **R8.8 The design tool offers only what the facility can run, and decides nothing about it.**
+  The orchestrator exports what its facility declares (`make facility-export` →
+  `facility-<name>.json`); the server reads the file named by `DMF_FACILITY` at start (unreadable or
+  invalid: it doesn't start) and serves `{name, capabilities, limits}` at `GET /api/facility` (`{}`
+  when unset). The capabilities are the library's `vocabulary.capabilities`, exactly the export's keys
+  (tested); one the file doesn't list is unavailable, as in the compiler. What needs what is library
+  data mirroring the compiler's gates: a feature's `needs` (with its options'), an enum value's
+  `x-enumNeeds` (`key.type = neural` → `neural-key`; SRT output `mode` caller / listener →
+  `srt-caller-out` / `srt-listener-out`), plus one engine rule: a resource profile with a GPU needs
+  `gpu`. Switchframe: SRT / MoQ / MXL / ST 2110 sources need `srt-in` / `moq` / `mxl` / `st2110`;
+  RTMP / MXL / ST 2110 outputs and recording need `rtmp-out` / `mxl` / `st2110` / `recording`;
+  speech-to-text, AI background removal and SCTE-104 need `asr`, `ai-segment`, `scte104`.
+  The function dialog disables what's unavailable and says why (what's already in use stays
+  enabled, so it can be turned off); the top bar names the facility. A workload that uses it can
+  still be saved, but each such option is a publish problem naming it ("vision-mixer: features:
+  AI speech-to-text (captions.asr) needs Speech-to-text (asr), which facility local doesn't offer").
+  With no facility set, everything is offered. **Product limits** (`rules.conflictsWith`: a block
+  can't run while another function has one of the listed values) are the exception: no facility
+  can honour them, so they're publish problems with or without one, one per copy, naming the value
+  and its path; the dialog shows them on the output's row. So far: an RTMP output with colour profile
+  `standard-hevc` or `professional` (the product's HEVC → H.264 transcoder isn't wired up, so it would
+  report active and send nothing). *Enforced by:* `facilityProblems`, `productProblems`
+  (`src/model/facility.ts`), `publishProblems` (`workload.ts`), `checkLibrary`, `server/main.ts`,
+  `server/app.ts`, `FunctionDialog.tsx`, `SchemaForm.tsx`, `FunctionSetup.tsx`, `tests/facility.test.ts`.
+- **R8.9 Publishing refuses every value the orchestrator's compiler would refuse,** so a design built
+  only from offered options deploys; the compiler keeps its checks for hand-edited XML. Each problem
+  names the compiler's parameter path (`vision-mixer: srt-out.srt.address: …`). The limits are read
+  from `switchframe-dmf/tools/dmf_compile/products/` and kept as data, never restated in code:
+  - schema keywords: `pattern` with `x-patternMessage` (SRT output address, RTMP URL, recording prefix,
+    SCTE-35 webhook, SRT caller address), `x-maxBytes` (source label: 128 UTF-8 bytes),
+    `exclusiveMinimum`, `x-unique` (SRT stream ID: unique among a block's copies in one function),
+    `x-facilityLimit` (recording storage ≤ the export's `limits.maxRecordingGiB`; checked only while a
+    facility is set, `GET /api/facility` serves `limits` too); plain values in a list are reported at
+    the list, naming the value;
+  - on the product's module: `setupSchema` (Switchframe: CPU above 0, memory at least 512 MiB,
+    `settings.extraArgs` a list of strings without `--demo`), `ModuleBlock.flowFormat` (the MXL flows a
+    block reads or writes: V210 / float32, 48 kHz stereo, progressive BT.709 SDR, frame size and rate
+    the function's own, i.e. the engine's) and `ModuleBlock.readsFrom` (Switchframe's MXL sources are
+    read from `dmf-mxl.*` test sources: the compiler connects only those, so this is the deployment's
+    limit recorded on the product's model). Only test sources and Switchframe write MXL, so
+    `readsFrom` can't fire while the facility allows one Switchframe per workload; it's kept because
+    it costs nothing;
+  - the workload's shape, from the facility export (the orchestrator's limits, compiler rule 2, not
+    the product's, so not module data): `limits.functionsPerWorkload` (`{<type>: {min, max}}`; local:
+    exactly one `switchframe.1`) and `limits.domainsPerWorkload` (local: 1), with every function in a
+    workload domain. Worded as the compiler does: "workload: functions: needs exactly one
+    switchframe.1 function, has 2 (mixer-b, vision-mixer); limits.functionsPerWorkload of facility
+    local", "workload: domains: needs exactly one MXL domain, has 2: aux, main; …", "cam2: domain:
+    "aux" is not the workload's domain "main"".
+  With no facility set, `x-facilityLimit` and the shape limits are skipped; every other check applies. A test source's
+  MXL output needs `mxl` (R8.8), as in the compiler.
+  *Enforced by:* `validateValue`, `checkParameterSchema` (`schema.ts`), `uniqueProblems`,
+  `setupSchemaProblems` (`limits.ts`), `flowRuleProblems`, `optionProblems` (`workload.ts`),
+  `facilityLimitProblem`, `shapeProblems` (`facility.ts`), `designProblems`, `checkModule`, `tests/compiler-checks.test.ts`
+  (one test per check; the cases in `tests/compiler-cases.ts`).
 - **R8.3 The workload description is the workflow intent** published to the orchestrator.
 - **R8.5 A workload says who may operate it** (`spec.access.roles`: usernames per role; Inspector →
   Workload → Access). Roles come from the library's vocabulary: director, audio, graphics, captioner,
@@ -376,6 +442,11 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-05 | XML publish (stage 2 of the orchestration build, `03-toolkit-spec.md` §9): `published.xml` route, *Publish XML*, `src/model/xml.ts`, schema copy, shared fixtures and `npm test` | R8.6 |
 | 2026-11-05 | Stage 2 review: XML encodability is a publish problem (the JSON route, XML route and canvas agree); workload, function and external ids follow the schema's `Id`, checked on save; MXL history ≥ 1 ms; `toPublished` drops `flowOptions` | R8.6, R8.7, R5.6 |
 | 2026-11-05 | From the compiler's check of Switchframe's request bodies: SRT caller address is `host:port`, SCTE-35 default rule `pass` / `drop`, recording rotation ≥ 1 min. Library 4.0.2 (a server recorded 4.0.1); `switchframe.1` stays 1.1.0: the change narrows what's accepted without changing what a value means, and no saved workload uses it | R7.7, R3.7, R3.5 |
+| 2026-11-11 | Facility capabilities (stage 7, `03-toolkit-spec.md` §8, called "R8.6" there; R8.6 was taken): `DMF_FACILITY`, `GET /api/facility`, `vocabulary.capabilities` (the export's 13 keys), `needs`, `x-enumNeeds`, a GPU needs `gpu`. Gates mirror the compiler's, including the six the spec's table leaves out (`srt-in`, `mxl`, `rtmp-out`, `recording`, `srt-caller-out`, `gpu`). Saving stays allowed; publishing refuses | R8.8, R3.6 |
+| 2026-11-11 | Product limits as `rules.conflictsWith` (RTMP with an HEVC colour profile), with or without a facility; mixer EQ and limiter ranges; help texts (key, replay buffer, SCTE-35 `drop`, `defaults.notes.resources`). Library 4.1.0 (4.0.2 was committed); `switchframe.1` stays 1.1.0: narrowing and help text, no saved workload uses it, and the compiler accepts only 1.1.0 | R8.8, R7.7, R3.8, R3.7, R3.5 |
+| 2026-11-11 | Stage 7A review: publishing refuses every value the compiler would refuse (MXL flow format and writer, SRT stream ID unique per function, label ≤ 128 bytes, SRT output address, RTMP URL, recording prefix and size against the facility's limit, SCTE-35 webhook, CPU > 0, memory ≥ 512 MiB, `extraArgs`), with the compiler's parameter paths; key fill source becomes a choice of input copies (it was described as a label). SRT caller address follows the compiler's `HOST_PORT`. Library stays 4.1.0 and `switchframe.1` 1.1.0: neither 4.1.0 nor this was committed or recorded, and no saved workload uses them. Resolves the open question from 7A | R8.9, R5.9, R4.5, R7.7, R8.8 |
+| 2026-11-11 | From the compiler's run on the 7A cases: at most one `switchframe.1` per workload (`maxPerWorkload`, compiler rule 2) is a publish problem naming the functions, with or without a facility. `readsFrom` stays, but can't fire while that holds. Case `mxl-writer` replaced by `switchframe-count` | R8.9 |
+| 2026-11-11 | Ruling: function and domain counts are the orchestrator's limits, so they come from the facility export (`limits.functionsPerWorkload`, `limits.domainsPerWorkload`), checked only while a facility is set; `maxPerWorkload` removed from the module (it was never committed). Cases `no-switchframe` and `two-domains` added | R8.9, R8.8; supersedes the previous line's `maxPerWorkload` |
 
 ## Open questions
 

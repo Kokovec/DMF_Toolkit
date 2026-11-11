@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
-import { api, describeError, refreshCatalog, useCatalog } from './api'
+import { api, describeError, refreshCatalog, refreshFacility, useCatalog, useFacility } from './api'
 import { EXTERNALS } from './model/externals'
 import { randomUuid } from './model/uuid'
 import { vendorSlug } from './model/modules'
@@ -46,6 +46,7 @@ import { ExternalNode, FunctionNode } from './components/MediaNode'
 import { DRAG_MIME, Palette } from './components/Palette'
 import { Inspector } from './components/Inspector'
 import { FunctionDialog } from './components/FunctionDialog'
+import { CAPABILITIES } from './model/facility'
 import { WorkloadBrowser } from './components/WorkloadBrowser'
 
 const nodeTypes = { fn: FunctionNode, ext: ExternalNode }
@@ -84,6 +85,7 @@ function download(name: string, data: unknown, type = 'application/json') {
 
 function Editor() {
   const catalog = useCatalog()
+  const facility = useFacility()
   const [metadata, setMetadata] = useState<WorkloadMeta>(initial.metadata)
   const [defaults, setDefaults] = useState<WorkloadDefaults>(initial.defaults)
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(initial.nodes)
@@ -103,7 +105,7 @@ function Editor() {
   const edges = useMemo(() => edgesFor(wires, nodes, selectedEdges, catalog), [wires, nodes, selectedEdges, catalog])
   const workload = useMemo(() => toWorkload(metadata, defaults, nodes, wires, access), [metadata, defaults, nodes, wires, access])
   const json = useMemo(() => JSON.stringify(workload), [workload])
-  const problems = useMemo(() => publishProblems(workload, catalog), [workload, catalog])
+  const problems = useMemo(() => publishProblems(workload, catalog, facility), [workload, catalog, facility])
   // MXL flows carried by the selected wire(s), for the Flow panel.
   const selectedFlows = useMemo(() => {
     const writers = new Set(edges.filter((e) => selectedEdges.has(e.id)).flatMap((e) => e.data?.wires.map((w) => w.from) ?? []))
@@ -118,6 +120,8 @@ function Editor() {
       () => setOnline(true),
       () => setOnline(false),
     )
+    // No answer (offline, older server): no facility, everything stays offered.
+    refreshFacility().catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -348,6 +352,18 @@ function Editor() {
           {metadata.name} · {savedHere ? `rev ${savedHere.revision}${dirty ? ' (modified)' : ''}` : 'not saved'}
         </span>
         <span className="spacer" />
+        {facility.capabilities && (
+          <span
+            className="status facility"
+            title={`What facility ${facility.name} doesn't offer is disabled: ${
+              CAPABILITIES.filter((c) => facility.capabilities![c.id] !== true)
+                .map((c) => c.label)
+                .join(', ') || 'nothing'
+            }`}
+          >
+            Facility {facility.name}
+          </span>
+        )}
         <span className={`status ${online ? 'online' : 'offline'}`} title={online ? 'Library server connected' : 'Library server not reachable'}>
           {online ? 'Library connected' : 'Offline'}
         </span>

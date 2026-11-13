@@ -14,12 +14,12 @@ import { checkLibrary, LIBRARY } from '../src/model/library'
 import type { Facility, FunctionInstance, JsonValue, ModuleCatalog, WorkloadDescription } from '../src/model/types'
 import { publishProblems, withSelection, type FnData } from '../src/model/workload'
 
-// The orchestrator's export (`make facility-export` in switchframe-dmf), read where it lives.
+// The orchestrator's export (`make facility-export` in DMF_Orchestrator), read where it lives.
 const EXPORT =
-  process.env.DMF_FACILITY ?? '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/switchframe-dmf/.state/facility-local.json'
+  process.env.DMF_FACILITY ?? '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/DMF_Orchestrator/.state/facility-local.json'
 const noExport = existsSync(EXPORT) ? false : `${EXPORT} isn't reachable (run make facility-export there, or bind-mount Ubuntu-24.04)`
 
-// What facility "local" declares (facility/local.yaml in switchframe-dmf), so the gating tests don't
+// What facility "local" declares (facility/local.yaml in DMF_Orchestrator), so the gating tests don't
 // depend on the cross-distro mount.
 const LOCAL: Facility = {
   name: 'local',

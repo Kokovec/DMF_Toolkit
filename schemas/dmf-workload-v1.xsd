@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   DMF workload desired state, version 1. Published by DMF Toolkit, consumed by the compiler in
-  switchframe-dmf. Contract and semantics: docs/orchestration/01-contract.md.
+  DMF_Orchestrator. Contract and semantics: docs/orchestration/01-contract.md.
 
   This file is the source of truth. DMF_Toolkit/schemas/dmf-workload-v1.xsd is a byte-identical copy.
   Any change that could make an existing document invalid or change its meaning needs a new namespace

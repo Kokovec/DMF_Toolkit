@@ -1,6 +1,6 @@
 // The studio-a workload, built through the model the way a user would: new instances, then only what
 // a user would set. Formats, discovery, health and resources come from each module's defaults.
-// Matches examples/studio-a.workload.xml in the orchestrator repo (switchframe-dmf).
+// Matches examples/studio-a.workload.xml in the orchestrator repo (DMF_Orchestrator).
 import { readFileSync } from 'node:fs'
 import { Catalog } from '../../src/model/catalog'
 import type { JsonValue, ModuleCatalog, VendorModule, Wire, WorkloadDescription } from '../../src/model/types'

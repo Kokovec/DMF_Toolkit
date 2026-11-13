@@ -54,7 +54,7 @@ what the operator wants. The orchestrator chooses hosts, replicas, licences and 
 `GET /api/workloads/:id/published.xml[?revision=N]` returns the same document as XML
 (`application/xml; charset=utf-8`), namespace `urn:dmf:workload:v1`, schema
 [`../schemas/dmf-workload-v1.xsd`](../schemas/dmf-workload-v1.xsd). *Publish XML* in the app downloads
-it. The definition is `switchframe-dmf/docs/orchestration/01-contract.md`; the XSD there is the source
+it. The definition is `DMF_Orchestrator/docs/orchestration/01-contract.md`; the XSD there is the source
 of truth and the copy here is byte-identical (a test checks its hash). In short:
 
 - **Mapping:** metadata as attributes of `<workload>` (plus `schemaVersion="1"`); `defaults` with each
@@ -84,7 +84,7 @@ of truth and the copy here is byte-identical (a test checks its hash). In short:
 The one thing the configurator reads from the orchestrator is what the facility declares it can
 run, so users don't design what can't deploy. It's never part of the published state.
 
-- **Source:** `make facility-export` in `switchframe-dmf` writes `.state/facility-<name>.json`
+- **Source:** `make facility-export` in `DMF_Orchestrator` writes `.state/facility-<name>.json`
   (`kind: FacilityExport`, `name`, `capabilities` id → boolean, `limits`). The server reads the file
   named by `DMF_FACILITY` at start (it refuses to start if that file is unreadable or invalid) and
   serves `{name, capabilities, limits}` at `GET /api/facility`, or `{}` when it's unset. Limits are

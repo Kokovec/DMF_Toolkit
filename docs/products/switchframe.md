@@ -3,7 +3,7 @@
 > Design rules: [`../design-rules.md`](../design-rules.md) (R3.1, R3.12–R3.16, R7.7, R8.4). This document maps
 > the Switchframe module's features to the product's real configuration, for the orchestrator
 > (the "compiler"). The definition, with each option's owner and build stage, is in the orchestrator
-> repo: `switchframe-dmf/docs/orchestration/02-switchframe-options.md`. If the two differ, that one wins.
+> repo: `DMF_Orchestrator/docs/orchestration/02-switchframe-options.md`. If the two differ, that one wins.
 
 Source: open-source **Switchframe** (github.com/zsiec/switchframe, fork github.com/thiagopnts/switchframe),
 `main@7923615` (2026-06-09), module `switchframe.1` version 1.1.0. Read from its README, `docs/reference/config-and-flags.md`,

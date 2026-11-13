@@ -13,8 +13,8 @@ import { publishProblems, toPublished } from '../src/model/workload'
 import { decimal, fromWorkloadXml, toWorkloadXml, XmlEncodeError } from '../src/model/xml'
 
 const XSD = new URL('../schemas/dmf-workload-v1.xsd', import.meta.url)
-// sha256 of switchframe-dmf/schemas/dmf-workload-v1.xsd (the source of truth) this copy must equal.
-const XSD_SHA256 = '286891a509d3eeb1b8e73f4283b252772adc34f95c3cec2e9b782aac570c0348'
+// sha256 of DMF_Orchestrator/schemas/dmf-workload-v1.xsd (the source of truth) this copy must equal.
+const XSD_SHA256 = '95d86535c074e423fedb39f6cf5dbdc3b3e08d0d61a18dbda0853aa5bf5f53b2'
 
 const hasXmllint = (() => {
   try {
@@ -53,7 +53,7 @@ describe('schema copy', () => {
   test('is byte-identical to the recorded source (sha256)', () => {
     assert.equal(createHash('sha256').update(readFileSync(XSD)).digest('hex'), XSD_SHA256)
   })
-  const source = '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/switchframe-dmf/schemas/dmf-workload-v1.xsd'
+  const source = '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/DMF_Orchestrator/schemas/dmf-workload-v1.xsd'
   test('equals the orchestrator repo copy, when visible', { skip: !existsSync(source) && 'orchestrator repo not visible' }, () => {
     assert.deepEqual(readFileSync(source), readFileSync(XSD))
   })

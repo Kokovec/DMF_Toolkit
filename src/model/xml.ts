@@ -1,6 +1,6 @@
 // The published desired state as XML (schemas/dmf-workload-v1.xsd, namespace urn:dmf:workload:v1),
 // the handover format the orchestrator reads. A lossless rendering of `toPublished`; the contract
-// is switchframe-dmf/docs/orchestration/01-contract.md (the source of truth; summary in
+// is DMF_Orchestrator/docs/orchestration/01-contract.md (the source of truth; summary in
 // docs/orchestrator-contract.md). Hand-written, with no dependency.
 //
 // toWorkloadXml: deterministic bytes (UTF-8, declaration, 2-space indent, LF, trailing newline, no

@@ -280,7 +280,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R8.6 The orchestrator reads the published revision as XML** (`GET
   /api/workloads/:id/published.xml[?revision=N]`, `application/xml; charset=utf-8`; *Publish XML* in
   the app downloads `<workload id>.workload.xml`). It's a lossless rendering of the JSON route, under
-  `switchframe-dmf/docs/orchestration/01-contract.md` and its XSD (the source of truth; this repo
+  `DMF_Orchestrator/docs/orchestration/01-contract.md` and its XSD (the source of truth; this repo
   keeps a byte-identical copy in `schemas/`, checked against a recorded hash). The same revision
   always gives the same bytes. It has the JSON route's checks and 422s; anything XML or the XSD
   can't carry is also 422, naming each location: characters XML 1.0 lacks, keys outside
@@ -328,7 +328,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 - **R8.9 Publishing refuses every value the orchestrator's compiler would refuse,** so a design built
   only from offered options deploys; the compiler keeps its checks for hand-edited XML. Each problem
   names the compiler's parameter path (`vision-mixer: srt-out.srt.address: …`). The limits are read
-  from `switchframe-dmf/tools/dmf_compile/products/` and kept as data, never restated in code:
+  from `DMF_Orchestrator/tools/dmf_compile/products/` and kept as data, never restated in code:
   - schema keywords: `pattern` with `x-patternMessage` (SRT output address, RTMP URL, recording prefix,
     SCTE-35 webhook, SRT caller address), `x-maxBytes` (source label: 128 UTF-8 bytes),
     `exclusiveMinimum`, `x-unique` (SRT stream ID: unique among a block's copies in one function),
@@ -450,6 +450,7 @@ primitives still existed; the parameters now live on features). `media-primitive
 | 2026-11-11 | From the compiler's run on the 7A cases: at most one `switchframe.1` per workload (`maxPerWorkload`, compiler rule 2) is a publish problem naming the functions, with or without a facility. `readsFrom` stays, but can't fire while that holds. Case `mxl-writer` replaced by `switchframe-count` | R8.9 |
 | 2026-11-11 | Ruling: function and domain counts are the orchestrator's limits, so they come from the facility export (`limits.functionsPerWorkload`, `limits.domainsPerWorkload`), checked only while a facility is set; `maxPerWorkload` removed from the module (it was never committed). Cases `no-switchframe` and `two-domains` added | R8.9, R8.8; supersedes the previous line's `maxPerWorkload` |
 | 2026-11-11 | From stage 7B: 720p on a `switchframe.1` instance with an MXL source or `mxl-out` is a product limit (`conflictsWith` on `switcher.input.mxl` / `switcher.output.mxl`), one problem per copy naming `engine.engine.resolution`, as the compiler does; 720p without MXL and `dmf-mxl` sources at 720p stay allowed. The dialog shows it on the input rows too. Library 4.1.1 (4.1.0 was committed); `switchframe.1` stays 1.1.0: narrowing, and no saved workload uses it (contract, module versions) | R8.8, R3.7, R3.5 |
+| 2026-11-13 | The orchestrator repo is renamed `switchframe-dmf` → `DMF_Orchestrator` (GitHub Kokovec/DMF_Orchestrator). References updated; earlier log lines keep the old name. Schema copy refreshed (header comment only; sha256 `95d86535…53b2`); the published XML is unchanged | R8.6 |
 
 ## Open questions
 

@@ -121,13 +121,111 @@ source of truth, and a test checks that this copy matches its hash. Two referenc
 [`docs/orchestrator-contract.md`](docs/orchestrator-contract.md) describes what the published
 state contains.
 
-## Getting started
+## Setting up the environment
 
-You need **Node.js 24** (the server uses the built-in `node:sqlite`). `xmllint` (from `libxml2`) is
-optional: with it, the tests also validate the XML against the XSD.
+The toolkit runs on Linux, macOS, or Windows through WSL 2. It was developed on Ubuntu under WSL 2.
+Apart from the Node.js packages, it has no database server or other services to install: the
+server stores its data in a SQLite file, using Node's built-in `node:sqlite`.
+
+### 1. Install the tools
+
+| Tool | Needed for | Install |
+| --- | --- | --- |
+| **Git** | Cloning the repo | `sudo apt install git` (Ubuntu/WSL), `brew install git` (macOS) |
+| **Node.js 24** and npm | Everything: the server needs Node 24 for `node:sqlite` | Through [nvm](https://github.com/nvm-sh/nvm), below |
+| **xmllint** (optional) | XSD validation in the tests (otherwise skipped) | `sudo apt install libxml2-utils` (Ubuntu/WSL); included with macOS |
+| **VS Code** (optional) | The workspace file `DMF Toolkit.code-workspace` | [code.visualstudio.com](https://code.visualstudio.com) |
+
+To install Node.js 24 with nvm:
 
 ```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# open a new terminal so nvm is on your PATH, then:
+nvm install 24
+nvm use 24
+node --version   # v24.x
+```
+
+nvm adds itself to interactive shells only. If a script or editor task can't find `node`, put
+Node 24 on its `PATH`. For example:
+`export PATH="$HOME/.nvm/versions/node/<version>/bin:$PATH"`.
+
+### 2. Clone and install
+
+```sh
+git clone https://github.com/Kokovec/DMF_Toolkit.git
+cd DMF_Toolkit
 npm install
+```
+
+`npm install` brings in React, React Flow, Vite, TypeScript, oxlint and tsx. The server itself
+has no runtime dependencies beyond Node.
+
+### 3. Check the setup
+
+```sh
+npm run build   # type-checks the UI and server
+npm test        # the whole suite should pass
+```
+
+Some tests are skipped, rather than failing, when an optional piece is missing:
+- XSD validation is skipped without `xmllint`.
+- The checks against the orchestrator are skipped unless the tests can find a DMF_Orchestrator
+  checkout. See step 5.
+
+### 4. Configuration (optional)
+
+The server reads these environment variables. None are needed for local development.
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `PORT` | `3001` | The API port (the dev UI proxies `/api` to 3001) |
+| `HOST` | `127.0.0.1` | The address the API listens on |
+| `DMF_DB` | `data/dmf-toolkit.db` | The SQLite file (created on first start; `:memory:` for a throwaway database) |
+| `DMF_CATALOGS` | `catalogs/` | Where the product catalogs are loaded from |
+| `DMF_FACILITY` | unset | The orchestrator's facility export. Unset means everything is offered |
+
+The tests also read `DMF_ORCHESTRATOR` and `DMF_FACILITY` (step 5).
+
+The `data/` folder is git-ignored. Deleting it gives you an empty database on the next start.
+
+### 5. The orchestrator (optional)
+
+The toolkit designs and publishes on its own: you don't need the orchestrator to build or use it.
+[DMF_Orchestrator](https://github.com/Kokovec/DMF_Orchestrator) is only needed to deploy what you
+design, or to have the toolkit offer only what a real facility can run.
+
+For the facility gating, you need the orchestrator's facility export. Producing it doesn't deploy
+anything:
+
+```sh
+git clone https://github.com/Kokovec/DMF_Orchestrator.git
+cd DMF_Orchestrator
+make prereqs           # once: its tools and Python venv in ./.tools (no sudo)
+make facility-export   # writes .state/facility-local.json
+```
+
+Then start the toolkit's server with `DMF_FACILITY` pointing at that file.
+
+The two repositories share a contract, and a few tests check that this side still matches the
+orchestrator's:
+- the XSD copy in `schemas/` must be byte-identical to the orchestrator's;
+- the facility capabilities the toolkit knows must be exactly the ones in the orchestrator's export.
+
+To run those checks, tell the tests where your checkout is. The schema check needs only the clone.
+The facility checks also need the export from the steps above.
+
+```sh
+DMF_ORCHESTRATOR=../DMF_Orchestrator npm test
+```
+
+`DMF_FACILITY` overrides the export's path, if you keep it elsewhere. Without a checkout, these
+tests are skipped and the rest of the suite still passes. You only need them when you change the
+schema, the capability list, or the orchestrator itself. The skip message says what's missing.
+
+## Running and testing
+
+```sh
 npm run server   # API + SQLite on http://localhost:3001 (data in data/, git-ignored)
 npm run dev      # UI on http://localhost:5173, proxies /api to the server
 ```

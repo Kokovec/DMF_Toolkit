@@ -83,6 +83,6 @@ Detail docs:
 - No auth yet.
 - Git:
   - branch `main`; commits use the GitHub noreply address (Kokovec), set as the repo-local identity;
-  - remote `origin` = https://github.com/Kokovec/DMF_Toolkit (private), tracking `main`;
+  - remote `origin` = https://github.com/Kokovec/DMF_Toolkit (public), tracking `main`;
   - `data/` (SQLite) is git-ignored;
   - commit only when the user asks.

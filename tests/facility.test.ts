@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { userInfo } from 'node:os'
 import { after, before, describe, test } from 'node:test'
 import { productCatalog, studioA } from '../scripts/fixtures/studio-a'
 import { createApp } from '../server/app'
@@ -16,7 +17,7 @@ import { publishProblems, withSelection, type FnData } from '../src/model/worklo
 
 // The orchestrator's export (`make facility-export` in DMF_Orchestrator), read where it lives.
 const EXPORT =
-  process.env.DMF_FACILITY ?? '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/DMF_Orchestrator/.state/facility-local.json'
+  process.env.DMF_FACILITY ?? `/mnt/wsl/instances/Ubuntu-24.04/home/${userInfo().username}/DMF_Orchestrator/.state/facility-local.json`
 const noExport = existsSync(EXPORT) ? false : `${EXPORT} isn't reachable (run make facility-export there, or bind-mount Ubuntu-24.04)`
 
 // What facility "local" declares (facility/local.yaml in DMF_Orchestrator), so the gating tests don't

@@ -82,8 +82,7 @@ Detail docs:
 - Only SRT parameters are fully defined; parameters for the other inputs and the outputs, more codecs and synchronizers are pending (see open questions in `docs/design-rules.md`).
 - No auth yet.
 - Git:
-  - branch `main`; repo-local identity Kokovec <6053105+Kokovec@users.noreply.github.com>;
+  - branch `main`; commits use the GitHub noreply address (Kokovec), set as the repo-local identity;
   - remote `origin` = https://github.com/Kokovec/DMF_Toolkit (private), tracking `main`;
-  - gh CLI v2.101.0 in `~/.local/bin`, logged in as Kokovec;
   - `data/` (SQLite) is git-ignored;
   - commit only when the user asks.

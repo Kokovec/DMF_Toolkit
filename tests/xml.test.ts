@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
+import { userInfo } from 'node:os'
 import { describe, test } from 'node:test'
 import { productCatalog, studioA } from '../scripts/fixtures/studio-a'
 import { everyValue } from '../scripts/fixtures/every-value'
@@ -53,7 +54,7 @@ describe('schema copy', () => {
   test('is byte-identical to the recorded source (sha256)', () => {
     assert.equal(createHash('sha256').update(readFileSync(XSD)).digest('hex'), XSD_SHA256)
   })
-  const source = '/mnt/wsl/instances/Ubuntu-24.04/home/dansi/DMF_Orchestrator/schemas/dmf-workload-v1.xsd'
+  const source = `/mnt/wsl/instances/Ubuntu-24.04/home/${userInfo().username}/DMF_Orchestrator/schemas/dmf-workload-v1.xsd`
   test('equals the orchestrator repo copy, when visible', { skip: !existsSync(source) && 'orchestrator repo not visible' }, () => {
     assert.deepEqual(readFileSync(source), readFileSync(XSD))
   })
